@@ -1,6 +1,6 @@
 # xtream-proxy
 
-**Easily manipulate IPTV XTREAM streams for a customized viewing experience.**
+**Easily manipulate IPTV XTREAM playlist for a customized viewing experience.**
 
 ---
 
@@ -36,6 +36,14 @@ This tool requires a valid IPTV stream subscription. Ensure your subscription is
 2. Configure `xtream-proxy` with your credentials and settings.
 3. Define filtering and manipulation rules in the configuration file (`xtream.json`).
 4. Use the generated playlist in your IPTV player.
+
+Run this Programm on your PC ...
+
+java -cp ./jm3u-1.0-SNAPSHOT.jar:./* my.xtream.Main
+
+In your IPTV app - replace the URL for your provider with the URL/PORT from your proxy, but keep the credentials from your provider.
+
+e.g. http://my.provider.url becomes http://192.168.2.16:8888
 
 Enjoy a more personalized IPTV experience! 🎉
 
