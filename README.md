@@ -67,10 +67,10 @@ Below is an example configuration file for `xtream-proxy`.
       "include category_name/^GERMAN/"
     ],
     "vod_categories": [
-      "include category_name/^(DE|EN|US|EN)/"
+      "include category_name/^(DE|AT|US|EN)/"
     ],
     "live_categories": [
-      "include category_name/^(AT|DE|FOR ADULTS)([|] |$)/",
+      "include category_name/^(AT|DE)([|] |$)/",
       "exclude category_name/(?i)(sport|dazn|rtl[+] ppv|prime ppv|formula 1 ppv|dyn ppv|discovery[+] ppv|bundesliga)/"
     ],
     "live_streams": [
