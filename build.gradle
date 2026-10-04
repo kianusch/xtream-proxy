@@ -15,7 +15,7 @@ dependencies {
     implementation 'org.tinylog:slf4j-tinylog:2.7.0'
     implementation 'io.javalin:javalin:6.4.0'
     implementation 'org.json:json:20240303'
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    // implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
 
 configurations.all {

@@ -1,6 +1,7 @@
 package my.xtream;
 
 import org.json.JSONObject;
+import org.tinylog.configuration.Configuration;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -8,35 +9,34 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.tinylog.Logger;
-import org.tinylog.configuration.Configuration;
 
 public class Main {
     static {
         System.setProperty("java.awt.headless", "true");
     }
 
-    public static void main(String[] args) throws IOException {
+    @SuppressWarnings("unchecked")
+    static void main(String[] args) throws IOException {
         Configuration.set("level", "DEBUG");
         Configuration.set("writer.format", "{date: HH:mm:ss}: {message}");
 
         Configuration.set("level@io.javalin", "WARN");
         Configuration.set("level@org.eclipse.jetty", "WARN");
 
-        String cfgPath = (args.length < 1)? cfgPath = "xtream.json" : args[0];
-        Map<String, Object> map = new JSONObject(Src.get(cfgPath)).toMap();
+        String cfgPath = (args.length < 1)? "xtream.json" : args[0];
+        Map<String, Object> map = new JSONObject(Get.get(cfgPath)).toMap();
         Map<String, Object> cfg = (Map<String, Object>) map.get("cfg");
 
+        /*
         String upstream;
         if (((String) map.get("provider")).startsWith("http")) {
             upstream = map.get("provider")+"/player_api.php?username="+map.get("username")+"&password="+map.get("password");
         } else {
             upstream = (String) map.get("provider");
         }
+        */
 
-        Logger.debug("upstream: {}", upstream);
-
-        Xtream xtream = new Xtream(upstream, map);
+        Xtream xtream = new Xtream(map);
         for (String file : Xtream.getFiles()) {
             if (!cfg.containsKey(file))
                 continue;

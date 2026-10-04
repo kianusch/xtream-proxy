@@ -5,7 +5,6 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.Map;
 
 public class Metadata {
@@ -15,8 +14,16 @@ public class Metadata {
     private final Map<String, Object> user_info;
 
     Metadata(String filePath) throws IOException {
-        metadata = new JSONObject(Src.get(filePath)).toMap();
+        metadata = new JSONObject(Get.get(filePath)).toMap();
         server_info = (Map<String, Object>) metadata.get("server_info");
+        if (filePath.startsWith("http://*")) {
+            String u1 = filePath.replaceFirst("^https?://", "");
+            // Remove path starting with first '/'
+            int slash = u1.indexOf('/');
+            String u2 = (slash >= 0) ? u1.substring(0, slash) : u1;
+            //server_info.put("url",u2);
+            server_info.put("url","192.168.2.16");
+        }
         user_info = (Map<String, Object>) metadata.get("user_info");
     }
 

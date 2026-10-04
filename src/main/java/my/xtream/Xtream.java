@@ -24,15 +24,22 @@ public class Xtream {
     private final String upstream;
     private final String epg;
 
-    String r_url;
-    String r_protocol;
-    String r_port;
+    private String r_url;
+    private String r_protocol;
+    private String r_port;
 
     String streamUrl;
     String streamPostFix;
+    String prvdr;
 
-    Xtream(String us, Map<String, Object> cfg) throws IOException {
-        upstream = us;
+    Xtream(Map<String, Object> cfg) throws IOException {
+        prvdr = (String) cfg.get("provider");
+        if (prvdr.startsWith("http")) {
+            upstream = prvdr+"/player_api.php?username="+cfg.get("username")+"&password="+cfg.get("password");
+        } else {
+            upstream = prvdr;
+        }
+
         epg = (String) cfg.get("epg");
         Logger.debug("reading: metadata");
 
@@ -63,14 +70,16 @@ public class Xtream {
         for (var file : files) {
             Logger.debug("reading: {}", file);
             if (upstream.startsWith("http"))
-                xtreamLists.put(file, new XtreamList(upstream+"&action=get_"+file));
+                xtreamLists.put(file, new XtreamList(Get.mkUrl(upstream)+"&action=get_"+file));
             else
                 xtreamLists.put(file, new XtreamList(upstream+file));
         }
     }
 
     String getRedirectURL() {
-        return r_protocol+"://"+r_url+":"+r_port;
+        if (prvdr.startsWith("http://*."))
+            return Get.mkUrl(prvdr);
+        return r_protocol+"://"+Get.mkUrl(r_url)+":"+r_port;
     }
 
     void cmd(String file, String arg) {
