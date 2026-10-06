@@ -1,5 +1,7 @@
 package my.xtream;
 
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.util.*;
 
@@ -19,58 +21,83 @@ public class Xtream {
     // private String header;
     private final Map<String, XtreamList> xtreamLists = new HashMap<>();
     private final Metadata metadata;
-    private final String upstream;
     private final String epg;
 
-    private String r_url;
-    private String r_protocol;
-    private String r_port;
+    private final String r_url;
+    private final String r_protocol;
+    private final String r_port;
 
     String streamUrl;
     String streamPostFix;
     String prvdr;
 
-    Xtream(Map<String, Object> cfg) throws IOException {
-        prvdr = (String) cfg.get("provider");
+    Xtream(JSONObject cfg) throws IOException {
+        prvdr = cfg.getString("provider");
+        String upstream;
         if (prvdr.startsWith("http")) {
             upstream = prvdr+"/player_api.php?username="+cfg.get("username")+"&password="+cfg.get("password");
         } else {
             upstream = prvdr;
         }
 
-        epg = (String) cfg.get("epg");
-        System.out.println("reading: metadata");
+        if (cfg.has("epg"))
+            epg = cfg.getString("epg");
+        else
+            epg = null;
+
+        System.out.println("reading: metadata from "+prvdr);
 
         if (upstream.startsWith("http"))
             metadata = new Metadata(upstream);
         else
-            metadata = new Metadata(upstream+"metadata");
+            metadata = new Metadata(upstream +"metadata");
 
-        r_url = (String) metadata.getServerInfo("url");
-        r_protocol = (String) metadata.getServerInfo("server_protocol");
-        r_port = (String) metadata.getServerInfo("port");
+        r_url = metadata.getServerInfo("url");
+        r_protocol = metadata.getServerInfo("server_protocol");
+        r_port = metadata.getServerInfo("port");
 
-        streamUrl = r_protocol+"://"+r_url+":"+r_port+"/";
+        String s_port;
+        String s_protocol;
+        if (cfg.has("override_protocol")) {
+            s_protocol = cfg.getString("override_protocol");
+            if (cfg.has("override_port")) {
+                s_port = cfg.getString("override_port");
+            } else {
+                if ("https".equals(s_protocol))
+                    s_port ="443";
+                else
+                    s_port ="80";
+            }
+        } else {
+            s_protocol = r_protocol;
+            s_port =r_port;
+        }
+
+        if ("80".equals(s_port) || "443".equals(s_port)) {
+            streamUrl = s_protocol + "://" + r_url + "/";
+        } else {
+            streamUrl = s_protocol + "://" + r_url + ":" + s_port + "/";
+        }
         streamPostFix = "/"+metadata.getUserInfo("username")+"/"+metadata.getUserInfo("password")+"/";
 
-        System.out.println(metadata.stringJSON());
+        if (cfg.has("my_url")) {
+            metadata.putServerInfo("url", cfg.getString("my_url"));
+        }
+        if (cfg.has("my_server_protocol")) {
+            metadata.putServerInfo("server_protocol", cfg.getString("my_server_protocol"));
+        }
+        if (cfg.has("my_port")) {
+            metadata.putServerInfo("port", cfg.getString("my_port"));
+        }
 
-        if (cfg.containsKey("my_url")) {
-            metadata.putServerInfo("url", (String) cfg.get("my_url"));
-        }
-        if (cfg.containsKey("my_server_protocol")) {
-            metadata.putServerInfo("server_protocol", (String) cfg.get("my_server_protocol"));
-        }
-        if (cfg.containsKey("my_port")) {
-            metadata.putServerInfo("port", (String) cfg.get("my_port"));
-        }
+        System.out.println(metadata.stringJSON());
 
         for (var file : files) {
             System.out.println("reading: "+ file);
             if (upstream.startsWith("http"))
                 xtreamLists.put(file, new XtreamList(Get.mkUrl(upstream)+"&action=get_"+file));
             else
-                xtreamLists.put(file, new XtreamList(upstream+file));
+                xtreamLists.put(file, new XtreamList(upstream +file));
         }
     }
 
