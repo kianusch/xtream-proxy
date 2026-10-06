@@ -1,7 +1,6 @@
 package my.xtream;
 
 import org.json.JSONObject;
-import org.tinylog.configuration.Configuration;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -17,12 +16,6 @@ public class Main {
 
     @SuppressWarnings("unchecked")
     static void main(String[] args) throws IOException {
-        Configuration.set("level", "DEBUG");
-        Configuration.set("writer.format", "{date: HH:mm:ss}: {message}");
-
-        Configuration.set("level@io.javalin", "WARN");
-        Configuration.set("level@org.eclipse.jetty", "WARN");
-
         String cfgPath = (args.length < 1)? "xtream.json" : args[0];
         Map<String, Object> map = new JSONObject(Get.get(cfgPath)).toMap();
         Map<String, Object> cfg = (Map<String, Object>) map.get("cfg");

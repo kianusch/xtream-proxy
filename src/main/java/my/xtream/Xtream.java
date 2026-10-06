@@ -1,7 +1,5 @@
 package my.xtream;
 
-import org.tinylog.Logger;
-
 import java.io.IOException;
 import java.util.*;
 
@@ -41,7 +39,7 @@ public class Xtream {
         }
 
         epg = (String) cfg.get("epg");
-        Logger.debug("reading: metadata");
+        System.out.println("reading: metadata");
 
         if (upstream.startsWith("http"))
             metadata = new Metadata(upstream);
@@ -68,7 +66,7 @@ public class Xtream {
         }
 
         for (var file : files) {
-            Logger.debug("reading: {}", file);
+            System.out.println("reading: "+ file);
             if (upstream.startsWith("http"))
                 xtreamLists.put(file, new XtreamList(Get.mkUrl(upstream)+"&action=get_"+file));
             else
