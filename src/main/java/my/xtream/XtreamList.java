@@ -37,12 +37,11 @@ public class XtreamList {
     }
 
     Map<String, Map<String, Object>> copy() {
-        Map<String, Map<String, Object>> byId = entries.stream()
+        return entries.stream()
                 .collect(Collectors.toMap(
                         row -> (String) row.get("category_id"),
                         row -> row
                 ));
-        return byId;
     }
 
     XtreamList set(String cmd) {
@@ -113,7 +112,7 @@ public class XtreamList {
 
     XtreamList replace(String cmd) {
         // First Pattern: Extract fields and replacements
-        final Pattern fieldsAndReplacementsPattern = Pattern.compile("([~]?[|\\-\\w]+)((?:(/[^/]+/[^/]*/)(?:,|$))*)");
+        final Pattern fieldsAndReplacementsPattern = Pattern.compile("(~?[|\\-\\w]+)((?:(/[^/]+/[^/]*/)(?:,|$))*)");
         final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
 
         if (fieldsAndReplacementsMatcher.matches()) {

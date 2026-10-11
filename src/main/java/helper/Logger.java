@@ -1,6 +1,5 @@
 package helper;
 
-import java.io.PrintStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.regex.Pattern;
@@ -44,26 +43,26 @@ public final class Logger {
     }
 
     public static void error(String message, Object... args) {
-        log(Level.ERROR, System.err, message, args);
+        log(Level.ERROR, message, args);
     }
 
     public static void warn(String message, Object... args) {
-        log(Level.WARN, System.err, message, args);
+        log(Level.WARN, message, args);
     }
 
     public static void info(String message, Object... args) {
-        log(Level.INFO, System.err, message, args);
+        log(Level.INFO, message, args);
     }
 
     public static void debug(String message, Object... args) {
-        log(Level.DEBUG, System.err, message, args);
+        log(Level.DEBUG, message, args);
     }
 
     public static void trace(String message, Object... args) {
-        log(Level.TRACE, System.err, message, args);
+        log(Level.TRACE, message, args);
     }
 
-    private static void log(Level messageLevel, PrintStream stream, String message, Object... args) {
+    private static void log(Level messageLevel, String message, Object... args) {
         Level currentLevel = level;
 
         if (!messageLevel.isEnabled(currentLevel)) {
@@ -79,7 +78,7 @@ public final class Logger {
 
         appendFormatted(sb, message, args);
 
-        stream.println(redact(sb));
+        System.err.println(redact(sb));
     }
 
     private static String redact(CharSequence text) {
