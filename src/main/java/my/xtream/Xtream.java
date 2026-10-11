@@ -1,8 +1,11 @@
 package my.xtream;
 
+import helper.Logger;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.*;
 
 public class Xtream {
@@ -13,31 +16,22 @@ public class Xtream {
             "series",
             "live_streams",
             "vod_streams"));
-    private final static Map<String, String> joins = Map.of(
-            "live_streams", "live_categories",
-            "series", "series_categories",
-            "vod_streams", "vod_categories");
 
     // private String header;
     private final Map<String, XtreamList> xtreamLists = new HashMap<>();
     private final Metadata metadata;
     private final String epg;
+    private final String uplink;
+    private final String streamPostFix;
+    private final String username;
+    private final String password;
+    private final JSONObject filter;
 
-    private final String r_url;
-    private final String r_protocol;
-    private final String r_port;
-
-    String streamUrl;
-    String streamPostFix;
-    String prvdr;
-
-    Xtream(JSONObject cfg) throws IOException {
-        prvdr = cfg.getString("provider");
-        String upstream;
-        if (prvdr.startsWith("http")) {
-            upstream = prvdr+"/player_api.php?username="+cfg.get("username")+"&password="+cfg.get("password");
+    Xtream(JSONObject cfg, String username, String password) throws IOException {
+        if (cfg.has("cfg")) {
+            filter = cfg.getJSONObject("cfg");
         } else {
-            upstream = prvdr;
+            filter = null;
         }
 
         if (cfg.has("epg"))
@@ -45,80 +39,74 @@ public class Xtream {
         else
             epg = null;
 
-        System.out.println("reading: metadata from "+prvdr);
+        String prvdr = cfg.getString("provider");
+        String upstream;
 
+        if (prvdr.startsWith("http")) {
+            upstream = prvdr + "/player_api.php?username=" + username + "&password=" + password;
+        } else {
+            upstream = prvdr;
+        }
+        Logger.info("Reading: metadata from {}", prvdr);
         if (upstream.startsWith("http"))
             metadata = new Metadata(upstream);
         else
-            metadata = new Metadata(upstream +"metadata");
+            metadata = new Metadata(upstream + ".metadata");
 
-        r_url = metadata.getServerInfo("url");
-        r_protocol = metadata.getServerInfo("server_protocol");
-        r_port = metadata.getServerInfo("port");
+        String r_url, r_protocol, r_port;
 
-        String s_port;
-        String s_protocol;
-        if (cfg.has("override_protocol")) {
-            s_protocol = cfg.getString("override_protocol");
-            if (cfg.has("override_port")) {
-                s_port = cfg.getString("override_port");
+        if (cfg.has("keep_uplink") && cfg.getBoolean("keep_uplink")) {
+            URI uri = URI.create(prvdr);
+            r_protocol = uri.getScheme();
+            r_url = uri.getHost();
+            int tmp_port = uri.getPort();
+
+            if (tmp_port == -1) {
+                r_port = switch (r_protocol.toLowerCase()) {
+                    case "http", "https" -> "";
+                    default -> throw new IllegalArgumentException(
+                            "No default port known for scheme: " + r_protocol
+                    );
+                };
             } else {
-                if ("https".equals(s_protocol))
-                    s_port ="443";
-                else
-                    s_port ="80";
+                r_port = String.valueOf(tmp_port);
             }
         } else {
-            s_protocol = r_protocol;
-            s_port =r_port;
+            r_url = metadata.getServerInfo("url");
+            r_protocol = metadata.getServerInfo("server_protocol");
+            r_port = metadata.getServerInfo("port");
         }
 
-        if ("80".equals(s_port) || "443".equals(s_port)) {
-            streamUrl = s_protocol + "://" + r_url + "/";
+        if ("80".equals(r_port) || "443".equals(r_port) || r_port.isEmpty()) {
+            uplink = r_protocol + "://" + r_url + "/";
         } else {
-            streamUrl = s_protocol + "://" + r_url + ":" + s_port + "/";
+            uplink = r_protocol + "://" + r_url + ":" + r_port + "/";
         }
-        streamPostFix = "/"+metadata.getUserInfo("username")+"/"+metadata.getUserInfo("password")+"/";
+        streamPostFix = "/" + metadata.getUserInfo("username") + "/" + metadata.getUserInfo("password") + "/";
 
-        if (cfg.has("my_url")) {
-            metadata.putServerInfo("url", cfg.getString("my_url"));
-        }
-        if (cfg.has("my_server_protocol")) {
-            metadata.putServerInfo("server_protocol", cfg.getString("my_server_protocol"));
-        }
-        if (cfg.has("my_port")) {
-            metadata.putServerInfo("port", cfg.getString("my_port"));
-        }
+        URI uri = URI.create(cfg.getString("me"));
+        String m_url = uri.getHost();
+        metadata.putServerInfo("url", m_url);
+        String m_protocol = uri.getScheme();
+        metadata.putServerInfo("server_protocol", m_protocol);
+        int m_port = uri.getPort();
 
-        System.out.println(metadata.stringJSON());
-
-        for (var file : files) {
-            System.out.println("reading: "+ file);
-            if (upstream.startsWith("http"))
-                xtreamLists.put(file, new XtreamList(Get.mkUrl(upstream)+"&action=get_"+file));
-            else
-                xtreamLists.put(file, new XtreamList(upstream +file));
-        }
-    }
-
-    String getRedirectURL() {
-        if (prvdr.startsWith("http://*."))
-            return Get.mkUrl(prvdr);
-        return r_protocol+"://"+Get.mkUrl(r_url)+":"+r_port;
-    }
-
-    void cmd(String file, String arg) {
-        if ("*".equals(file)) {
-            for (var process : files) {
-                xtreamLists.get(process).cmd(arg, getIDs(process));
+        if (m_port > -1) {
+            switch (m_protocol.toLowerCase()) {
+                case "http" -> metadata.putServerInfo("port", String.valueOf(m_port));
+                case "https" -> metadata.putServerInfo("https_port", String.valueOf(m_port));
+                default -> throw new IllegalArgumentException(
+                        "No default port known for scheme: " + m_protocol
+                );
             }
-        } else {
-            xtreamLists.get(file).cmd(arg, getIDs(file));
         }
+
+        this.username = metadata.getUserInfo("username");
+        this.password = metadata.getUserInfo("password");
     }
 
     Set<Object> getIDs(String file) {
-        String categoryFile = joins.get(file);
+        String categoryFile = XtreamList.getCat(file);
         if (categoryFile != null) {
             return xtreamLists.get(categoryFile).getAll("category_id");
         } else {
@@ -126,23 +114,57 @@ public class Xtream {
         }
     }
 
-    String apiCmd (String cmd) {
-        if (cmd==null) {
+    XtreamList update(String file) throws IOException {
+        String c = XtreamList.getCat(file);
+        XtreamList p = null;
+
+        if (c != null) {
+            if (!xtreamLists.containsKey(c)) {
+                p = update(c);
+            } else {
+                p = xtreamLists.get(c);
+            }
+        }
+
+        Logger.info("Reading: {} [{}]", file, c);
+        XtreamList x = new XtreamList(uplink + "player_api.php?username=" + username + "&password=" + password + "&action=get_" + file, p);
+
+        if (filter.has(file)) {
+            JSONArray commands = filter.getJSONArray(file);
+
+            for (int i = 0; i < commands.length(); i++) {
+                String command = commands.getString(i);
+                x.cmd(command);
+            }
+        }
+        xtreamLists.put(file, x);
+        return x;
+    }
+
+    String apiCmd(String cmd) throws IOException {
+        if (cmd == null) {
             return metadata.stringJSON();
-        } else if ("getM3U".equals(cmd)) {
-            return xtreamLists.get("live_streams").stringM3U(xtreamLists.get("live_categories"), streamUrl, streamPostFix);
         } else if (cmd.startsWith("get_") && files.contains(cmd.substring(4))) {
-            String file = cmd.substring(4);
-            return xtreamLists.get(file).cmd("stringJSON", getIDs(file));
+            String list = cmd.substring(4);
+            if (!xtreamLists.containsKey(list)) {
+                update(list);
+            }
+            return xtreamLists.get(list).stringJSON(getIDs(list));
         }
         return null;
     }
 
-    static ArrayList<String> getFiles() {
-        return files;
+    String getM3U() {
+        return xtreamLists.get("live_streams").stringM3U(xtreamLists.get("live_categories"), uplink, streamPostFix);
     }
 
     String getEPG() {
         return epg;
     }
+
+    String redirectTarget(String path, String rawQuery) {
+        String query = rawQuery == null ? "" : "?" + rawQuery;
+        return uplink + path + query;
+    }
+
 }

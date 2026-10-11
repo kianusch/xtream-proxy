@@ -10,20 +10,110 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class XtreamList {
-    private final List<Map<String, Object>> entries;
+    private final static Map<String, String> joins = Map.of(
+            "live_streams", "live_categories",
+            "series", "series_categories",
+            "vod_streams", "vod_categories");
 
-    XtreamList(String filePath) throws IOException {
+    private final List<Map<String, Object>> entries;
+    private final Map<String, Map<String, Object>> parent;
+
+    XtreamList(String filePath, XtreamList parent) throws IOException {
         entries = new ArrayList<>();
         JSONArray jsonArray = new JSONArray(Get.get(filePath));
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject jsonObject = jsonArray.getJSONObject(i);
             entries.add(jsonObject.toMap());
         }
+        if (parent != null) {
+            this.parent = parent.copy();
+        } else {
+            this.parent = null;
+        }
+    }
+
+    public static String getCat(String file) {
+        return joins.get(file);
+    }
+
+    Map<String, Map<String, Object>> copy() {
+        Map<String, Map<String, Object>> byId = entries.stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row.get("category_id"),
+                        row -> row
+                ));
+        return byId;
+    }
+
+    XtreamList set(String cmd) {
+        final Pattern fieldsAndReplacementsPattern = Pattern.compile("(~?\\w+)/([^/]*)/\\s*(\\w+)/(.+)/$");
+        final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
+        if (fieldsAndReplacementsMatcher.matches()) {
+            String cField = fieldsAndReplacementsMatcher.group(1);
+            String condRegex = fieldsAndReplacementsMatcher.group(2);
+            String targetField = fieldsAndReplacementsMatcher.group(3);
+            String targetValue = fieldsAndReplacementsMatcher.group(4);
+            Pattern condPattern = Pattern.compile(condRegex);
+
+            boolean srcIsParent;
+            String condField;
+
+            if (cField.startsWith("~")) {
+                srcIsParent = true;
+                condField = cField.substring(1);
+            } else {
+                srcIsParent = false;
+                condField = cField;
+            }
+
+            Pattern pattern = Pattern.compile("\\$\\{([^}]*)}");
+            Matcher matcher = pattern.matcher(targetValue);
+            String template = matcher.find() ? matcher.group(1) : null;
+
+            // Replace entries
+            entries.replaceAll(entryMap -> {
+                String condFileValue;
+                if (srcIsParent) {
+                     var v = parent.get((String) entryMap.get("category_id"));
+                     if (v!=null)
+                         condFileValue = (String) v.get(condField);
+                     else
+                         condFileValue = null;
+                } else {
+                    condFileValue = (String) entryMap.get(condField);
+                }
+                //System.err.println(condFileValue+" "+condRegex+" "+condPattern.matcher(condFileValue).find());
+                if (condFileValue != null && condPattern.matcher(condFileValue).find()) {
+                    if (template != null) {
+                        String t;
+                        if (template.isEmpty()) {
+                            if (srcIsParent) {
+                                t = (String) parent.get((String) entryMap.get("category_id")).get(condField);
+                            } else {
+                                t = (String) entryMap.get(condField);
+                            }
+                        } else {
+                            if (template.startsWith("_")) {
+                                t = (String) parent.get((String) entryMap.get("category_id")).get(template.substring(1));
+                            } else {
+                                t = (String) entryMap.get(template);
+                            }
+                        }
+                        String value = targetValue.replace("${" + template + "}", t.toLowerCase().replace(" ", "-"));
+                        entryMap.put(targetField, value);
+                    } else {
+                        entryMap.put(targetField, targetValue);
+                    }
+                }
+                return entryMap;
+            });
+        }
+        return this;
     }
 
     XtreamList replace(String cmd) {
         // First Pattern: Extract fields and replacements
-        final Pattern fieldsAndReplacementsPattern = Pattern.compile("([|\\-\\w]+)((?:(/[^/]+/[^/]*/)(?:,|$))*)");
+        final Pattern fieldsAndReplacementsPattern = Pattern.compile("([~]?[|\\-\\w]+)((?:(/[^/]+/[^/]*/)(?:,|$))*)");
         final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
 
         if (fieldsAndReplacementsMatcher.matches()) {
@@ -35,21 +125,43 @@ public class XtreamList {
             final Matcher replacementsMatcher = replacementsPattern.matcher(replacements);
 
             // Replace entries
-            entries.replaceAll(entryMap -> {
-                for (String field : fields.split("[|]")) {
-                    String value = (String) entryMap.get(field);
-                    if (value != null) {
-                        replacementsMatcher.reset();
-                        while (replacementsMatcher.find()) {
-                            String target = replacementsMatcher.group(1);
-                            String replacement = replacementsMatcher.group(2);
-                            value = value.replaceAll(target, replacement);
+            if (fields.startsWith("~")) {
+                String f = fields.substring(1);
+                parent.values().forEach(entryMap -> {
+                    for (String field : f.split("[|]")) {
+                        Object rawValue = entryMap.get(field);
+
+                        if (rawValue instanceof String value) {
+                            replacementsMatcher.reset();
+
+                            while (replacementsMatcher.find()) {
+                                String target = replacementsMatcher.group(1);
+                                String replacement = replacementsMatcher.group(2);
+                                value = value.replaceAll(target, replacement);
+                            }
+
+                            entryMap.put(field, value);
                         }
-                        entryMap.put(field, value);
                     }
-                }
-                return entryMap;
-            });
+                });
+                System.err.println(new JSONObject(parent).toString(2));
+            } else {
+                entries.replaceAll(entryMap -> {
+                    for (String field : fields.split("[|]")) {
+                        String value = (String) entryMap.get(field);
+                        if (value != null) {
+                            replacementsMatcher.reset();
+                            while (replacementsMatcher.find()) {
+                                String target = replacementsMatcher.group(1);
+                                String replacement = replacementsMatcher.group(2);
+                                value = value.replaceAll(target, replacement);
+                            }
+                            entryMap.put(field, value);
+                        }
+                    }
+                    return entryMap;
+                });
+            }
             return this;
         }
 
@@ -83,63 +195,72 @@ public class XtreamList {
         return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
     }
 
-    XtreamList capitalize(String cmd) {
-    // Compile patterns once to improve efficiency
-    final Pattern fieldsAndReplacementsPattern = Pattern.compile("([\\-\\w]+)/([^/]+)/");
-    final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
-
-    if (fieldsAndReplacementsMatcher.matches()) {
-        String field = fieldsAndReplacementsMatcher.group(1);
-        String matcherPattern = fieldsAndReplacementsMatcher.group(2);
-
-        final Pattern matchPattern = Pattern.compile(matcherPattern);
-        final Pattern uppercaseWordsPattern = Pattern.compile("\\b[A-Z]{3,}");
-
+    XtreamList deumlaut(String field) {
         entries.replaceAll(entryMap -> {
             String fieldValue = (String) entryMap.get(field);
-
             if (fieldValue != null) {
-                Matcher matcher = matchPattern.matcher(fieldValue);
-
-                if (matcher.find()) {
-                    String matchedSegmentOrig = matcher.group();
-                    String matchedSegmentNew = matchedSegmentOrig;
-
-                    Matcher uppercaseMatcher = uppercaseWordsPattern.matcher(matchedSegmentOrig);
-                    while (uppercaseMatcher.find()) {
-                        String uppercaseWord = uppercaseMatcher.group();
-                        String capitalizedWord = capitalizeString(uppercaseWord);
-                        matchedSegmentNew = matchedSegmentNew.replaceFirst(uppercaseWord, capitalizedWord);
-                    }
-
-                    fieldValue = fieldValue.replaceFirst(matchedSegmentOrig, matchedSegmentNew);
-                    entryMap.put(field, fieldValue);
-                }
+                entryMap.put(field, UMLAUT_PATTERN.matcher(fieldValue).replaceAll(match -> UMLAUT_MAP.get(match.group())));
             }
             return entryMap;
         });
         return this;
     }
 
-    throw new IllegalArgumentException("Invalid replace command: " + cmd);
-}
+    XtreamList capitalize(String cmd) {
+        // Compile patterns once to improve efficiency
+        final Pattern fieldsAndReplacementsPattern = Pattern.compile("([\\-\\w]+)/([^/]+)/");
+        final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
+
+        if (fieldsAndReplacementsMatcher.matches()) {
+            String field = fieldsAndReplacementsMatcher.group(1);
+            String matcherPattern = fieldsAndReplacementsMatcher.group(2);
+
+            final Pattern matchPattern = Pattern.compile(matcherPattern);
+            final Pattern uppercaseWordsPattern = Pattern.compile("\\b[A-Z]{3,}");
+
+            entries.replaceAll(entryMap -> {
+                String fieldValue = (String) entryMap.get(field);
+
+                if (fieldValue != null) {
+                    Matcher matcher = matchPattern.matcher(fieldValue);
+
+                    if (matcher.find()) {
+                        String matchedSegmentOrig = matcher.group();
+                        String matchedSegmentNew = matchedSegmentOrig;
+
+                        Matcher uppercaseMatcher = uppercaseWordsPattern.matcher(matchedSegmentOrig);
+                        while (uppercaseMatcher.find()) {
+                            String uppercaseWord = uppercaseMatcher.group();
+                            String capitalizedWord = capitalizeString(uppercaseWord);
+                            matchedSegmentNew = matchedSegmentNew.replaceFirst(uppercaseWord, capitalizedWord);
+                        }
+
+                        fieldValue = fieldValue.replaceFirst(matchedSegmentOrig, matchedSegmentNew);
+                        entryMap.put(field, fieldValue);
+                    }
+                }
+                return entryMap;
+            });
+            return this;
+        }
+
+        throw new IllegalArgumentException("Invalid replace command: " + cmd);
+    }
 
 
-    String cmd(String cmd, Set<Object> join) {
+    void cmd(String cmd) {
         String[] command = cmd.split("[\\s:]", 2);
         switch (command[0]) {
-            case "print" -> print(join);
-            case "printJSON" -> printJSON(join);
-            case "stringJSON" -> {
-                return stringJSON(join);
-            }
             case "include" -> filter(command[1], true);
             case "exclude" -> filter(command[1], false);
             case "replace" -> replace(command[1]);
             case "capitalize" -> capitalize(command[1]);
+            case "set" -> set(command[1]);
+            case "deumlaut" -> deumlaut(command[1]);
+            case "noop" -> {
+            }
             default -> throw new IllegalArgumentException("Invalid command: " + cmd);
         }
-        return null;
     }
 
     private void filter(String cmd, boolean include) {
@@ -246,9 +367,9 @@ public class XtreamList {
     // http://cf.pro-cdn.me:80/series/48833fd7865b/a5700ffdf3/772734.mp4
 
     String stringM3U(XtreamList categories, String url, String postfix) {
-        Map<String,String> filter = categories.getAll("category_id","category_name");
+        Map<String, String> filter = categories.getAll("category_id", "category_name");
         List<Map<?, ?>> tmp = entries.stream().filter(e -> filter.containsKey(e.get("category_id"))).collect(Collectors.toList());
-        return "#EXTM3U\n"+tmp.stream().map(e -> "#EXTINF:-1 tvg-id=\"\" tvg-name=\"" + e.get("name") + "\" tvg-logo=\"" + e.get("stream_icon") + "\" group-title=\"" + filter.get(e.get("category_id")) + "\"," + e.get("name") + "\n" + Get.mkUrl(url)+e.get("stream_type")+postfix+e.get("stream_id")+".ts").collect(Collectors.joining("\n"));
+        return "#EXTM3U\n" + tmp.stream().map(e -> "#EXTINF:-1 tvg-id=\"\" tvg-name=\"" + e.get("name") + "\" tvg-logo=\"" + e.get("stream_icon") + "\" group-title=\"" + filter.get(e.get("category_id")) + "\"," + e.get("name") + "\n" + Get.mkUrl(url) + e.get("stream_type") + postfix + e.get("stream_id") + ".ts").collect(Collectors.joining("\n"));
     }
 
     private Map<String, String> getAll(String keyField, String valueField) {
@@ -258,4 +379,12 @@ public class XtreamList {
     public Set<Object> getAll(String field) {
         return entries.stream().map(map -> map.get(field)).collect(Collectors.toSet());
     }
+
+   private static final Pattern UMLAUT_PATTERN = Pattern.compile("[ÄÖÜäöüß]");
+
+private static final Map<String, String> UMLAUT_MAP = Map.of(
+        "Ä", "A", "Ö", "O", "Ü", "U",
+        "ä", "a", "ö", "o", "ü", "u",
+        "ß", "s"
+);
 }

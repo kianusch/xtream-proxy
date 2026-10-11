@@ -18,15 +18,25 @@ public class Metadata {
         server_info = metadata.getJSONObject("server_info");
     }
 
-    String stringJSON() {
+    Metadata update() {
         long timestamp = System.currentTimeMillis() / 1000;
         String formattedDateTime = LocalDateTime.now().format(formatter);
 
         server_info.put("timestamp_now", timestamp);
         server_info.put("time_now", formattedDateTime);
 
-        return metadata.toString(2);
+        //return metadata.toString(2);
+        return this;
     }
+
+    String stringJSON(int indent) {
+        return metadata.toString(indent);
+    }
+
+    String stringJSON() {
+        return metadata.toString();
+    }
+
 
     void putServerInfo(String key, String value) {
         server_info.put(key, value);
