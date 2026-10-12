@@ -13,7 +13,7 @@ public class Metadata {
     private final JSONObject user_info;
 
     Metadata(String filePath) throws IOException {
-        metadata = new JSONObject(Get.get(filePath));
+        metadata = new JSONObject(HttpClient.get(filePath));
         user_info = metadata.getJSONObject("user_info");
         server_info = metadata.getJSONObject("server_info");
     }

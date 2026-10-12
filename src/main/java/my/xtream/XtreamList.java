@@ -1,5 +1,6 @@
 package my.xtream;
 
+import helper.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -20,7 +21,7 @@ public class XtreamList {
 
     XtreamList(String filePath, XtreamList parent) throws IOException {
         entries = new ArrayList<>();
-        JSONArray jsonArray = new JSONArray(Get.get(filePath));
+        JSONArray jsonArray = new JSONArray(HttpClient.get(filePath));
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject jsonObject = jsonArray.getJSONObject(i);
             entries.add(jsonObject.toMap());
@@ -368,7 +369,7 @@ public class XtreamList {
     String stringM3U(XtreamList categories, String url, String postfix) {
         Map<String, String> filter = categories.getAll("category_id", "category_name");
         List<Map<?, ?>> tmp = entries.stream().filter(e -> filter.containsKey(e.get("category_id"))).collect(Collectors.toList());
-        return "#EXTM3U\n" + tmp.stream().map(e -> "#EXTINF:-1 tvg-id=\"\" tvg-name=\"" + e.get("name") + "\" tvg-logo=\"" + e.get("stream_icon") + "\" group-title=\"" + filter.get(e.get("category_id")) + "\"," + e.get("name") + "\n" + Get.mkUrl(url) + e.get("stream_type") + postfix + e.get("stream_id") + ".ts").collect(Collectors.joining("\n"));
+        return "#EXTM3U\n" + tmp.stream().map(e -> "#EXTINF:-1 tvg-id=\"\" tvg-name=\"" + e.get("name") + "\" tvg-logo=\"" + e.get("stream_icon") + "\" group-title=\"" + filter.get(e.get("category_id")) + "\"," + e.get("name") + "\n" + HttpClient.mkUrl(url) + e.get("stream_type") + postfix + e.get("stream_id") + ".ts").collect(Collectors.joining("\n"));
     }
 
     private Map<String, String> getAll(String keyField, String valueField) {

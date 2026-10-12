@@ -27,7 +27,7 @@ public class Server {
     }
 
     void readCfg(String cfgPath) throws IOException {
-        JSONObject map = new JSONObject(Get.get(cfgPath));
+        JSONObject map = new JSONObject(HttpClient.get(cfgPath));
 
         URI uri = URI.create(map.getString("me"));
 

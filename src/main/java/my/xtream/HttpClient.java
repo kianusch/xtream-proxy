@@ -2,7 +2,6 @@ package my.xtream;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
@@ -11,12 +10,12 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.regex.Pattern;
 
-public final class Get {
-    private static final HttpClient CLIENT = HttpClient.newBuilder()
+public final class HttpClient {
+    private static final java.net.http.HttpClient CLIENT = java.net.http.HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    private Get() {
+    private HttpClient() {
     }
 
     public static String get(String filePath) throws IOException {
