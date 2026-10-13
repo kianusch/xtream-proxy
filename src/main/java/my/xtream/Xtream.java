@@ -128,6 +128,7 @@ public class Xtream {
 
         Logger.info("Reading: {} [{}]", file, c);
         XtreamList x = new XtreamList(uplink + "player_api.php?username=" + username + "&password=" + password + "&action=get_" + file, p);
+        Logger.info("Read {} entries", x.size());
 
         if (filter.has(file)) {
             JSONArray commands = filter.getJSONArray(file);

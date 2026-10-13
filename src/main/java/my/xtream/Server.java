@@ -18,6 +18,7 @@ public class Server {
     private final Map<String, Xtream> xtreams=new HashMap<>();
     private volatile HttpServer httpServer;
     private JSONObject cfg;
+    private JSONObject rootCfg;
     private final String cfgFile;
     private int port;
 
@@ -27,9 +28,9 @@ public class Server {
     }
 
     void readCfg(String cfgPath) throws IOException {
-        JSONObject map = new JSONObject(HttpClient.get(cfgPath));
+        rootCfg = new JSONObject(HttpClient.get(cfgPath));
 
-        URI uri = URI.create(map.getString("me"));
+        URI uri = URI.create(rootCfg.getString("me"));
 
         String protocol = uri.getScheme();
         // String host = uri.getHost();
@@ -45,7 +46,7 @@ public class Server {
                 );
             };
         }
-        this.cfg=map;
+        this.cfg=rootCfg;
     }
 
     public synchronized void run() throws IOException {
@@ -130,9 +131,14 @@ public class Server {
         // System.out.println("Inbound -> " + path + " ? " + rawQuery);
 
         if (username == null || password == null) {
-            String r = cfg.getString("provider");
-            Logger.info("Redirect -> {} ",redirectTarget(r, path, rawQuery));
-            redirect(exchange, redirectTarget(r, path, rawQuery));
+            if ("/get.epg".equals(path)) {
+                Logger.info("Redirect -> {}", rootCfg.getString("epg."+rawQuery));
+                redirect(exchange, rootCfg.getString("epg."+rawQuery));
+            } else {
+                String r = cfg.getString("provider");
+                Logger.info("Redirect -> {} ", redirectTarget(r, path, rawQuery));
+                redirect(exchange, redirectTarget(r, path, rawQuery));
+            }
         } else {
             if (xtreams.containsKey(username)) {
                 xtream = xtreams.get(username);
@@ -144,7 +150,7 @@ public class Server {
             switch (path) {
                 case "/xmltv.php" -> {
                     String epg = xtream.getEPG();
-                    Logger.info("Redirect -> {} ",xtream.redirectTarget(path, rawQuery));
+                    Logger.info("Redirect -> {} ",epg!=null?epg:xtream.redirectTarget(path, rawQuery));
                     redirect(exchange, epg != null ? epg : xtream.redirectTarget(path, rawQuery));
                 }
 

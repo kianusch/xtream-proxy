@@ -1,6 +1,5 @@
 package my.xtream;
 
-import helper.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -20,16 +19,18 @@ public class XtreamList {
     private final Map<String, Map<String, Object>> parent;
 
     XtreamList(String filePath, XtreamList parent) throws IOException {
-        entries = new ArrayList<>();
-        JSONArray jsonArray = new JSONArray(HttpClient.get(filePath));
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONObject jsonObject = jsonArray.getJSONObject(i);
-            entries.add(jsonObject.toMap());
-        }
         if (parent != null) {
             this.parent = parent.copy();
         } else {
             this.parent = null;
+        }
+        entries = new ArrayList<>();
+        JSONArray jsonArray = new JSONArray(HttpClient.get(filePath));
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject jsonObject = jsonArray.getJSONObject(i);
+            if (this.parent == null || this.parent.containsKey(jsonObject.getString("category_id"))) {
+                entries.add(jsonObject.toMap());
+            }
         }
     }
 
@@ -74,11 +75,11 @@ public class XtreamList {
             entries.replaceAll(entryMap -> {
                 String condFileValue;
                 if (srcIsParent) {
-                     var v = parent.get((String) entryMap.get("category_id"));
-                     if (v!=null)
-                         condFileValue = (String) v.get(condField);
-                     else
-                         condFileValue = null;
+                    var v = parent.get((String) entryMap.get("category_id"));
+                    if (v != null)
+                        condFileValue = (String) v.get(condField);
+                    else
+                        condFileValue = null;
                 } else {
                     condFileValue = (String) entryMap.get(condField);
                 }
@@ -380,11 +381,15 @@ public class XtreamList {
         return entries.stream().map(map -> map.get(field)).collect(Collectors.toSet());
     }
 
-   private static final Pattern UMLAUT_PATTERN = Pattern.compile("[ÄÖÜäöüß]");
+    private static final Pattern UMLAUT_PATTERN = Pattern.compile("[ÄÖÜäöüß]");
 
-private static final Map<String, String> UMLAUT_MAP = Map.of(
-        "Ä", "A", "Ö", "O", "Ü", "U",
-        "ä", "a", "ö", "o", "ü", "u",
-        "ß", "s"
-);
+    private static final Map<String, String> UMLAUT_MAP = Map.of(
+            "Ä", "A", "Ö", "O", "Ü", "U",
+            "ä", "a", "ö", "o", "ü", "u",
+            "ß", "s"
+    );
+
+    public int size() {
+        return entries.size();
+    }
 }
