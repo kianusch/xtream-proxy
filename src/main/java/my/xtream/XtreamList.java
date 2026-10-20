@@ -16,13 +16,19 @@ public class XtreamList {
             "vod_streams", "vod_categories");
 
     private final List<Map<String, Object>> entries;
-    private final Map<String, Map<String, Object>> parent;
+    private Map<String, Map<String, Object>> parent;
+    private final XtreamList p;
+
+    private JSONArray back=null;
+    private boolean isDirty=true;
 
     XtreamList(String filePath, XtreamList parent) throws IOException {
         if (parent != null) {
             this.parent = parent.copy();
+            this.p = parent;
         } else {
             this.parent = null;
+            this.p = null;
         }
         entries = new ArrayList<>();
         JSONArray jsonArray = new JSONArray(HttpClient.get(filePath));
@@ -32,6 +38,27 @@ public class XtreamList {
                 entries.add(jsonObject.toMap());
             }
         }
+        back=jsonArray;
+        isDirty=false;
+    }
+
+    public void reset() {
+        if (p != null && p.isDirty) {
+            p.reset();
+            this.parent = p.copy();
+        }
+        entries.clear();
+        for (int i = 0; i < back.length(); i++) {
+            JSONObject jsonObject = back.getJSONObject(i);
+            if (this.parent == null || this.parent.containsKey(jsonObject.getString("category_id"))) {
+                entries.add(jsonObject.toMap());
+            }
+        }
+        isDirty=false;
+    }
+
+    void makeDirty() {
+        isDirty=true;
     }
 
     public static String getCat(String file) {
@@ -114,15 +141,17 @@ public class XtreamList {
 
     XtreamList replace(String cmd) {
         // First Pattern: Extract fields and replacements
-        final Pattern fieldsAndReplacementsPattern = Pattern.compile("(~?[|\\-\\w]+)((?:(/[^/]+/[^/]*/)(?:,|$))*)");
+        final Pattern fieldsAndReplacementsPattern = Pattern.compile( "(~?[|\\-\\w]+)((?:(/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/)(?:,|$))*)" );
         final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
 
         if (fieldsAndReplacementsMatcher.matches()) {
             String fields = fieldsAndReplacementsMatcher.group(1);
             String replacements = fieldsAndReplacementsMatcher.group(2);
+            //System.err.println("f:"+fields);
+            //System.err.println("f:"+replacements);
 
             // Compile the second pattern to extract individual replacements
-            final Pattern replacementsPattern = Pattern.compile("/([^/]+)/([^/]*)/(?:,|$)");
+            final Pattern replacementsPattern = Pattern.compile("/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/(?:,|$)");
             final Matcher replacementsMatcher = replacementsPattern.matcher(replacements);
 
             // Replace entries
@@ -167,7 +196,7 @@ public class XtreamList {
         }
 
         // Second Pattern: Handle field mapping replacement
-        final Pattern fieldMappingPattern = Pattern.compile("([\\-\\w]+)/([\\-\\w]+)/([^/]+)/([^/]*)/");
+        final Pattern fieldMappingPattern = Pattern.compile( "([\\-\\w]+)/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/" );
         final Matcher fieldMappingMatcher = fieldMappingPattern.matcher(cmd);
 
         if (fieldMappingMatcher.matches()) {
@@ -250,6 +279,9 @@ public class XtreamList {
 
 
     void cmd(String cmd) {
+        if (cmd.startsWith("//")||cmd.startsWith("#"))
+            return;
+
         String[] command = cmd.split("[\\s:]", 2);
         switch (command[0]) {
             case "include" -> filter(command[1], true);

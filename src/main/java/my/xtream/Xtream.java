@@ -25,15 +25,15 @@ public class Xtream {
     private final String streamPostFix;
     private final String username;
     private final String password;
-    private final JSONObject filter;
+    // private final Map<String,Object> filter;
+    private JSONObject filter;
 
-    Xtream(JSONObject cfg, String username, String password) throws IOException {
-        if (cfg.has("cfg")) {
-            filter = cfg.getJSONObject("cfg");
-        } else {
-            filter = null;
-        }
+    private void setCfg(JSONObject cfg) {
+            this.filter = cfg;
+    }
 
+    Xtream(JSONObject cfg, String username, String password, JSONObject filter) throws IOException {
+        this.filter = filter;
         if (cfg.has("epg"))
             epg = cfg.getString("epg");
         else
@@ -140,6 +140,31 @@ public class Xtream {
         }
         xtreamLists.put(file, x);
         return x;
+    }
+
+    public void reset(JSONObject cfg) {
+        setCfg(cfg);
+        //for (XtreamList x: xtreamLists.values()) {
+            //x.makeDirty();
+        //}
+        //for (XtreamList x: xtreamLists.values()) {
+            //x.reset();
+        //}
+
+        for (String s: files) {
+            if (filter.has(s) && xtreamLists.containsKey(s)) {
+                Logger.info("Updating: {}", s);
+                XtreamList x=xtreamLists.get(s);
+                x.reset();
+
+                JSONArray commands = filter.getJSONArray(s);
+
+                for (int i = 0; i < commands.length(); i++) {
+                    String command = commands.getString(i);
+                    x.cmd(command);
+                }
+            }
+        }
     }
 
     String apiCmd(String cmd) throws IOException {

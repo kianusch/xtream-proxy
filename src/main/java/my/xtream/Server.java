@@ -2,7 +2,6 @@ package my.xtream;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -13,27 +12,40 @@ import java.util.HashMap;
 import java.util.Map;
 
 import helper.Logger;
+import org.json.JSONObject;
 
 public class Server {
+    // Each User has a XTREAM config. Each XTREAM hast several XTREAM lists.
     private final Map<String, Xtream> xtreams=new HashMap<>();
     private volatile HttpServer httpServer;
-    private JSONObject cfg;
-    private JSONObject rootCfg;
     private final String cfgFile;
     private int port;
 
+    //private YAML _rootCfg;
+    private JSONObject _cfg;
+    private JSONObject _filter;
+
     Server(String cfgFile) throws IOException {
-        this.cfgFile = cfgFile;
-        readCfg(cfgFile);
+        if (cfgFile.endsWith(".cfg")) {
+            this.cfgFile = cfgFile.substring(0,cfgFile.length()-4);
+            readCfg();
+            readFilter();
+        } else {
+            throw new RuntimeException("Config File must end with .cfg");
+        }
     }
 
-    void readCfg(String cfgPath) throws IOException {
-        rootCfg = new JSONObject(HttpClient.get(cfgPath));
+    void readFilter() throws IOException {
+        _filter = new JSONObject(HttpClient.get(this.cfgFile + ".filter"));
+    }
 
-        URI uri = URI.create(rootCfg.getString("me"));
+    void readCfg() throws IOException {
+        _cfg = new JSONObject(HttpClient.get(this.cfgFile+".cfg"));
+        // _rootCfg = new YAML(cfgPath+".yml");
+
+        URI uri = URI.create(_cfg.getString("me"));
 
         String protocol = uri.getScheme();
-        // String host = uri.getHost();
 
         this.port = uri.getPort();
 
@@ -46,7 +58,6 @@ public class Server {
                 );
             };
         }
-        this.cfg=rootCfg;
     }
 
     public synchronized void run() throws IOException {
@@ -113,9 +124,8 @@ public class Server {
 
     private void processGet(HttpExchange exchange, String path) throws IOException {
         if ( "/reload".equals(path)) {
-            readCfg(this.cfgFile);
+            reset();
             sendStatus(exchange, 200);
-            xtreams.clear();
             return;
         }
 
@@ -128,14 +138,13 @@ public class Server {
         String action = params.get("action");
 
         Xtream xtream;
-        // System.out.println("Inbound -> " + path + " ? " + rawQuery);
 
         if (username == null || password == null) {
             if ("/get.epg".equals(path)) {
-                Logger.info("Redirect -> {}", rootCfg.getString("epg."+rawQuery));
-                redirect(exchange, rootCfg.getString("epg."+rawQuery));
+                Logger.info("Redirect -> {}", _cfg.getString("epg."+rawQuery));
+                redirect(exchange, _cfg.getString("epg."+rawQuery));
             } else {
-                String r = cfg.getString("provider");
+                String r = _cfg.getString("provider");
                 Logger.info("Redirect -> {} ", redirectTarget(r, path, rawQuery));
                 redirect(exchange, redirectTarget(r, path, rawQuery));
             }
@@ -143,7 +152,7 @@ public class Server {
             if (xtreams.containsKey(username)) {
                 xtream = xtreams.get(username);
             } else {
-                xtream = new Xtream(cfg, username, password);
+                xtream = new Xtream(_cfg, username, password, _filter);
                 xtreams.put(username, xtream);
             }
 
@@ -287,5 +296,11 @@ public class Server {
          * intentionally conservative.
          */
         return false;
+    }
+    private void reset() throws IOException {
+        readFilter();
+        for (Xtream x: xtreams.values()) {
+            x.reset(_filter);
+        }
     }
 }
