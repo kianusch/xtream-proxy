@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,15 +16,13 @@ import helper.Logger;
 import org.json.JSONObject;
 
 public class Server {
-    // Each User has a XTREAM config. Each XTREAM hast several XTREAM lists.
-    private final Map<String, Xtream> xtreams=new HashMap<>();
+    private final Map<String, Uplink> xtreams=new HashMap<>();
     private volatile HttpServer httpServer;
     private final String cfgFile;
     private int port;
 
-    //private YAML _rootCfg;
     private JSONObject _cfg;
-    private JSONObject _filter;
+    private Filter _filter;
 
     Server(String cfgFile) throws IOException {
         if (cfgFile.endsWith(".cfg")) {
@@ -36,7 +35,7 @@ public class Server {
     }
 
     void readFilter() throws IOException {
-        _filter = new JSONObject(HttpClient.get(this.cfgFile + ".filter"));
+        _filter = new Filter(Path.of(this.cfgFile + ".filter"));
     }
 
     void readCfg() throws IOException {
@@ -102,11 +101,11 @@ public class Server {
                 default -> sendStatus(exchange, 405);
             }
         } catch (Exception e) {
-            e.printStackTrace();
-
             if (!isResponseClosed(exchange)) {
                 sendStatus(exchange, 500);
             }
+            Logger.error("Error: {}",e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -137,7 +136,7 @@ public class Server {
         String password = params.get("password");
         String action = params.get("action");
 
-        Xtream xtream;
+        Uplink xtream;
 
         if (username == null || password == null) {
             if ("/get.epg".equals(path)) {
@@ -152,7 +151,7 @@ public class Server {
             if (xtreams.containsKey(username)) {
                 xtream = xtreams.get(username);
             } else {
-                xtream = new Xtream(_cfg, username, password, _filter);
+                xtream = new Uplink(_cfg, username, password, _filter);
                 xtreams.put(username, xtream);
             }
 
@@ -299,7 +298,7 @@ public class Server {
     }
     private void reset() throws IOException {
         readFilter();
-        for (Xtream x: xtreams.values()) {
+        for (Uplink x: xtreams.values()) {
             x.reset(_filter);
         }
     }

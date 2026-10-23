@@ -1,22 +1,13 @@
 package my.xtream;
 
 import helper.Logger;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 
-public class Xtream {
-    private final static ArrayList<String> files = new ArrayList<>(List.of(
-            "live_categories",
-            "series_categories",
-            "vod_categories",
-            "series",
-            "live_streams",
-            "vod_streams"));
-
+public class Uplink {
     // private String header;
     private final Map<String, XtreamList> xtreamLists = new HashMap<>();
     private final Metadata metadata;
@@ -25,15 +16,13 @@ public class Xtream {
     private final String streamPostFix;
     private final String username;
     private final String password;
-    // private final Map<String,Object> filter;
-    private JSONObject filter;
 
-    private void setCfg(JSONObject cfg) {
-            this.filter = cfg;
-    }
+    private final static Map<String, String> PARENTNAMES = Map.of(
+            "live_streams", "live_categories",
+            "series", "series_categories",
+            "vod_streams", "vod_categories");
 
-    Xtream(JSONObject cfg, String username, String password, JSONObject filter) throws IOException {
-        this.filter = filter;
+    Uplink(JSONObject cfg, String username, String password, Filter filter) throws IOException {
         if (cfg.has("epg"))
             epg = cfg.getString("epg");
         else
@@ -103,66 +92,31 @@ public class Xtream {
 
         this.username = metadata.getUserInfo("username");
         this.password = metadata.getUserInfo("password");
-    }
 
-    Set<Object> getIDs(String file) {
-        String categoryFile = XtreamList.getCat(file);
-        if (categoryFile != null) {
-            return xtreamLists.get(categoryFile).getAll("category_id");
-        } else {
-            return null;
+        for (String s: PARENTNAMES.keySet()) {
+            String p=PARENTNAMES.get(s);
+            XtreamList pt=new XtreamList(null, filter.get(p),p, uplink, username, password);
+            xtreamLists.put(p,pt);
+            xtreamLists.put(s,new XtreamList(pt, filter.get(s), s, uplink, username, password));
         }
-    }
-
-    XtreamList update(String file) throws IOException {
-        String c = XtreamList.getCat(file);
-        XtreamList p = null;
-
-        if (c != null) {
-            if (!xtreamLists.containsKey(c)) {
-                p = update(c);
-            } else {
-                p = xtreamLists.get(c);
+        for (String s: filter.keySet()) {
+            if (!xtreamLists.containsKey(s)) {
+                xtreamLists.put(s,new XtreamList(null, filter.get(s), s, uplink, username, password));
             }
         }
-
-        Logger.info("Reading: {} [{}]", file, c);
-        XtreamList x = new XtreamList(uplink + "player_api.php?username=" + username + "&password=" + password + "&action=get_" + file, p);
-        Logger.info("Read {} entries", x.size());
-
-        if (filter.has(file)) {
-            JSONArray commands = filter.getJSONArray(file);
-
-            for (int i = 0; i < commands.length(); i++) {
-                String command = commands.getString(i);
-                x.cmd(command);
-            }
-        }
-        xtreamLists.put(file, x);
-        return x;
     }
 
-    public void reset(JSONObject cfg) {
-        setCfg(cfg);
-        //for (XtreamList x: xtreamLists.values()) {
-            //x.makeDirty();
-        //}
-        //for (XtreamList x: xtreamLists.values()) {
-            //x.reset();
-        //}
+    String getUplinkUrl(String listName) {
+        return uplink + "player_api.php?username=" + username + "&password=" + password + "&action=get_" + listName;
+    }
 
-        for (String s: files) {
-            if (filter.has(s) && xtreamLists.containsKey(s)) {
+    public void reset(Filter filter) {
+        for (String s: filter.keySet()) {
+            if (xtreamLists.containsKey(s)) {
                 Logger.info("Updating: {}", s);
-                XtreamList x=xtreamLists.get(s);
-                x.reset();
-
-                JSONArray commands = filter.getJSONArray(s);
-
-                for (int i = 0; i < commands.length(); i++) {
-                    String command = commands.getString(i);
-                    x.cmd(command);
-                }
+                xtreamLists.get(s).reset(filter.get(s));
+            } else {
+                xtreamLists.put(s,new XtreamList(null, filter.get(s), s, uplink,  username, password));
             }
         }
     }
@@ -170,17 +124,13 @@ public class Xtream {
     String apiCmd(String cmd) throws IOException {
         if (cmd == null) {
             return metadata.stringJSON();
-        } else if (cmd.startsWith("get_") && files.contains(cmd.substring(4))) {
-            String list = cmd.substring(4);
-            if (!xtreamLists.containsKey(list)) {
-                update(list);
-            }
-            return xtreamLists.get(list).stringJSON(getIDs(list));
+        } else if (cmd.startsWith("get_") && xtreamLists.containsKey(cmd.substring(4))) {
+            return xtreamLists.get( cmd.substring(4) ).stringJSON();
         }
         return null;
     }
 
-    String getM3U() {
+    String getM3U() throws IOException {
         return xtreamLists.get("live_streams").stringM3U(xtreamLists.get("live_categories"), uplink, streamPostFix);
     }
 

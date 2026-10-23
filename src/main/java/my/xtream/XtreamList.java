@@ -4,83 +4,100 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class XtreamList {
-    private final static Map<String, String> joins = Map.of(
-            "live_streams", "live_categories",
-            "series", "series_categories",
-            "vod_streams", "vod_categories");
+    private List<Map<String, Object>> entries;
+    private Map<String, Map<String, Object>> entriesMap;
+    private final XtreamList parentList;
 
-    private final List<Map<String, Object>> entries;
-    private Map<String, Map<String, Object>> parent;
-    private final XtreamList p;
+    private JSONArray orig;
+    private Map<String, List<String>> _filter;
+    private final String uplink;
+    private final String listname;
+    private final String username;
+    private final String password;
 
-    private JSONArray back=null;
-    private boolean isDirty=true;
+    private Instant lastUpdate = Instant.EPOCH;
 
-    XtreamList(String filePath, XtreamList parent) throws IOException {
-        if (parent != null) {
-            this.parent = parent.copy();
-            this.p = parent;
-        } else {
-            this.parent = null;
-            this.p = null;
+    private boolean isDirty() {
+        return entries == null;
+    }
+
+    void update() throws IOException {
+        if (parentList != null && parentList.isDirty()) {
+            parentList.update();
+            entries = null;
         }
-        entries = new ArrayList<>();
-        JSONArray jsonArray = new JSONArray(HttpClient.get(filePath));
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONObject jsonObject = jsonArray.getJSONObject(i);
-            if (this.parent == null || this.parent.containsKey(jsonObject.getString("category_id"))) {
-                entries.add(jsonObject.toMap());
+
+        if (Duration.between(lastUpdate, Instant.now()).toSeconds() > 3600) {
+            orig = null;
+            entries = null;
+        }
+
+        if (isDirty()) {
+            if (orig == null) {
+                String ul = uplink + "/player_api.php?username=" + username + "&password=" + password + "&action=get_" + listname;
+                orig = new JSONArray(HttpClient.get(ul));
+                lastUpdate = Instant.now();
+            }
+
+            entries = filterAndCvt(orig);
+            applyFilter();
+        }
+    }
+
+    XtreamList(XtreamList parent, Map<String, List<String>> _filter, String listname, String uplink, String username, String password) {
+        this.uplink = uplink.endsWith("/")?uplink.substring(0, uplink.length()-1):uplink;
+        this.listname = listname;
+        this.username = username;
+        this.password = password;
+        this._filter = _filter;
+        parentList = parent;
+        orig = null;
+        entries = null;
+    }
+
+    public XtreamList reset(Map<String, List<String>> filter) {
+        this._filter = filter;
+        entries = null;
+        return this;
+    }
+
+    List<Map<String, Object>> filterAndCvt(JSONArray al) {
+        List<Map<String, Object>> e = new ArrayList<>();
+        for (int i = 0; i < al.length(); i++) {
+            JSONObject jsonObject = al.getJSONObject(i);
+            if (parentList == null || parentList.has(jsonObject.getString("category_id"))) {
+                e.add(jsonObject.toMap());
             }
         }
-        back=jsonArray;
-        isDirty=false;
+        return e;
     }
 
-    public void reset() {
-        if (p != null && p.isDirty) {
-            p.reset();
-            this.parent = p.copy();
-        }
-        entries.clear();
-        for (int i = 0; i < back.length(); i++) {
-            JSONObject jsonObject = back.getJSONObject(i);
-            if (this.parent == null || this.parent.containsKey(jsonObject.getString("category_id"))) {
-                entries.add(jsonObject.toMap());
-            }
-        }
-        isDirty=false;
+    boolean has(String id) {
+        return entriesMap.containsKey(id);
     }
 
-    void makeDirty() {
-        isDirty=true;
+    Map<String, Object> get(String id) {
+        return entriesMap.get(id);
     }
 
-    public static String getCat(String file) {
-        return joins.get(file);
-    }
-
-    Map<String, Map<String, Object>> copy() {
-        return entries.stream()
-                .collect(Collectors.toMap(
-                        row -> (String) row.get("category_id"),
-                        row -> row
-                ));
-    }
-
-    XtreamList set(String cmd) {
-        final Pattern fieldsAndReplacementsPattern = Pattern.compile("(~?\\w+)/([^/]*)/\\s*(\\w+)/(.+)/$");
+    void s(String field, String cmd) {
+        // first try ... s/MATCHFIELD/MATCH/DST/
+        final Pattern fieldsAndReplacementsPattern = Pattern.compile("^s/(~?\\w+)/([^/]*)/(.+)/$");
         final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
+
         if (fieldsAndReplacementsMatcher.matches()) {
             String cField = fieldsAndReplacementsMatcher.group(1);
             String condRegex = fieldsAndReplacementsMatcher.group(2);
-            String targetField = fieldsAndReplacementsMatcher.group(3);
-            String targetValue = fieldsAndReplacementsMatcher.group(4);
+            String targetValue = fieldsAndReplacementsMatcher.group(3);
             Pattern condPattern = Pattern.compile(condRegex);
 
             boolean srcIsParent;
@@ -102,7 +119,7 @@ public class XtreamList {
             entries.replaceAll(entryMap -> {
                 String condFileValue;
                 if (srcIsParent) {
-                    var v = parent.get((String) entryMap.get("category_id"));
+                    var v = parentList.get((String) entryMap.get("category_id"));
                     if (v != null)
                         condFileValue = (String) v.get(condField);
                     else
@@ -116,116 +133,50 @@ public class XtreamList {
                         String t;
                         if (template.isEmpty()) {
                             if (srcIsParent) {
-                                t = (String) parent.get((String) entryMap.get("category_id")).get(condField);
+                                t = (String) parentList.get((String) entryMap.get("category_id")).get(condField);
                             } else {
                                 t = (String) entryMap.get(condField);
                             }
                         } else {
-                            if (template.startsWith("_")) {
-                                t = (String) parent.get((String) entryMap.get("category_id")).get(template.substring(1));
+                            if (template.startsWith("~")) {
+                                t = (String) parentList.get((String) entryMap.get("category_id")).get(template.substring(1));
                             } else {
                                 t = (String) entryMap.get(template);
                             }
                         }
                         String value = targetValue.replace("${" + template + "}", t.toLowerCase().replace(" ", "-"));
-                        entryMap.put(targetField, value);
+                        entryMap.put(field, value);
                     } else {
-                        entryMap.put(targetField, targetValue);
+                        entryMap.put(field, targetValue);
                     }
                 }
                 return entryMap;
             });
-        }
-        return this;
-    }
-
-    XtreamList replace(String cmd) {
-        // First Pattern: Extract fields and replacements
-        final Pattern fieldsAndReplacementsPattern = Pattern.compile( "(~?[|\\-\\w]+)((?:(/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/)(?:,|$))*)" );
-        final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
-
-        if (fieldsAndReplacementsMatcher.matches()) {
-            String fields = fieldsAndReplacementsMatcher.group(1);
-            String replacements = fieldsAndReplacementsMatcher.group(2);
-            //System.err.println("f:"+fields);
-            //System.err.println("f:"+replacements);
-
-            // Compile the second pattern to extract individual replacements
-            final Pattern replacementsPattern = Pattern.compile("/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/(?:,|$)");
-            final Matcher replacementsMatcher = replacementsPattern.matcher(replacements);
-
-            // Replace entries
-            if (fields.startsWith("~")) {
-                String f = fields.substring(1);
-                parent.values().forEach(entryMap -> {
-                    for (String field : f.split("[|]")) {
-                        Object rawValue = entryMap.get(field);
-
-                        if (rawValue instanceof String value) {
-                            replacementsMatcher.reset();
-
-                            while (replacementsMatcher.find()) {
-                                String target = replacementsMatcher.group(1);
-                                String replacement = replacementsMatcher.group(2);
-                                value = value.replaceAll(target, replacement);
-                            }
-
-                            entryMap.put(field, value);
-                        }
-                    }
-                });
-                System.err.println(new JSONObject(parent).toString(2));
-            } else {
-                entries.replaceAll(entryMap -> {
-                    for (String field : fields.split("[|]")) {
-                        String value = (String) entryMap.get(field);
-                        if (value != null) {
-                            replacementsMatcher.reset();
-                            while (replacementsMatcher.find()) {
-                                String target = replacementsMatcher.group(1);
-                                String replacement = replacementsMatcher.group(2);
-                                value = value.replaceAll(target, replacement);
-                            }
-                            entryMap.put(field, value);
-                        }
-                    }
-                    return entryMap;
-                });
-            }
-            return this;
+            return;
         }
 
-        // Second Pattern: Handle field mapping replacement
-        final Pattern fieldMappingPattern = Pattern.compile( "([\\-\\w]+)/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/" );
-        final Matcher fieldMappingMatcher = fieldMappingPattern.matcher(cmd);
+        // ... s/MATCH/DST/
+        final Pattern replacementsPattern = Pattern.compile("^s/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/$");
+        final Matcher replacementsMatcher = replacementsPattern.matcher(cmd);
 
-        if (fieldMappingMatcher.matches()) {
-            String dstField = fieldMappingMatcher.group(1);
-            String srcField = fieldMappingMatcher.group(2);
-            String srcValue = fieldMappingMatcher.group(3);
-            String dstValue = fieldMappingMatcher.group(4);
-
-            // Precompile the source value pattern
-            final Pattern srcValuePattern = Pattern.compile(srcValue);
+        if (replacementsMatcher.matches()) {
+            String target = replacementsMatcher.group(1);
+            String replacement = replacementsMatcher.group(2);
 
             entries.replaceAll(entryMap -> {
-                String fieldValue = (String) entryMap.get(srcField);
-                if (fieldValue != null && srcValuePattern.matcher(fieldValue).find()) {
-                    entryMap.put(dstField, dstValue);
+                String value = (String) entryMap.get(field);
+                if (value != null) {
+                    value = value.replaceAll(target, replacement);
+                    entryMap.put(field, value);
                 }
                 return entryMap;
             });
-            return this;
+            return;
         }
-
-        throw new IllegalArgumentException("Invalid replace command: " + cmd);
+        throw new IllegalArgumentException("Invalid filter: " + field + "." + cmd);
     }
 
-    String capitalizeString(String s) {
-        return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
-    }
-
-    XtreamList deumlaut(String field) {
+    void deUmlaut(String field) {
         entries.replaceAll(entryMap -> {
             String fieldValue = (String) entryMap.get(field);
             if (fieldValue != null) {
@@ -233,141 +184,53 @@ public class XtreamList {
             }
             return entryMap;
         });
-        return this;
     }
 
-    XtreamList capitalize(String cmd) {
-        // Compile patterns once to improve efficiency
-        final Pattern fieldsAndReplacementsPattern = Pattern.compile("([\\-\\w]+)/([^/]+)/");
-        final Matcher fieldsAndReplacementsMatcher = fieldsAndReplacementsPattern.matcher(cmd);
-
-        if (fieldsAndReplacementsMatcher.matches()) {
-            String field = fieldsAndReplacementsMatcher.group(1);
-            String matcherPattern = fieldsAndReplacementsMatcher.group(2);
-
-            final Pattern matchPattern = Pattern.compile(matcherPattern);
-            final Pattern uppercaseWordsPattern = Pattern.compile("\\b[A-Z]{3,}");
-
-            entries.replaceAll(entryMap -> {
-                String fieldValue = (String) entryMap.get(field);
-
-                if (fieldValue != null) {
-                    Matcher matcher = matchPattern.matcher(fieldValue);
-
-                    if (matcher.find()) {
-                        String matchedSegmentOrig = matcher.group();
-                        String matchedSegmentNew = matchedSegmentOrig;
-
-                        Matcher uppercaseMatcher = uppercaseWordsPattern.matcher(matchedSegmentOrig);
-                        while (uppercaseMatcher.find()) {
-                            String uppercaseWord = uppercaseMatcher.group();
-                            String capitalizedWord = capitalizeString(uppercaseWord);
-                            matchedSegmentNew = matchedSegmentNew.replaceFirst(uppercaseWord, capitalizedWord);
-                        }
-
-                        fieldValue = fieldValue.replaceFirst(matchedSegmentOrig, matchedSegmentNew);
-                        entryMap.put(field, fieldValue);
-                    }
-                }
-                return entryMap;
-            });
-            return this;
-        }
-
-        throw new IllegalArgumentException("Invalid replace command: " + cmd);
-    }
-
-
-    void cmd(String cmd) {
-        if (cmd.startsWith("//")||cmd.startsWith("#"))
-            return;
-
-        String[] command = cmd.split("[\\s:]", 2);
-        switch (command[0]) {
-            case "include" -> filter(command[1], true);
-            case "exclude" -> filter(command[1], false);
-            case "replace" -> replace(command[1]);
-            case "capitalize" -> capitalize(command[1]);
-            case "set" -> set(command[1]);
-            case "deumlaut" -> deumlaut(command[1]);
-            case "noop" -> {
+    void assign(String field, String tmplate) {
+            String t = tmplate.substring(1)
+                    .replace("${username}", username)
+                    .replace("${password}", password)
+                    .replace("${uplink}", uplink);
+            Pattern pattern = Pattern.compile("\\$\\{([^}]*)}");
+            Matcher matcher = pattern.matcher(t);
+            String template = matcher.find() ? matcher.group(1) : null;
+            if (template != null) {
+                entries.replaceAll(entryMap -> {
+                    String tt =String.valueOf(entryMap.get(template));
+                    String value = t.replace("${" + template + "}", tt);
+                    entryMap.put(field, value);
+                    return entryMap;
+                });
             }
+    }
+
+    void cmd(String f, String cmd) {
+        switch (cmd) {
+            case String s when s.startsWith("i/") -> f(f, cmd, true);
+            case String s when s.startsWith("e/") -> f(f, cmd, false);
+            case String s when s.startsWith("s/") -> s(f, cmd);
+            case String s when s.startsWith("=") -> assign(f, cmd);
+            case "deumlaut" -> deUmlaut(f);
             default -> throw new IllegalArgumentException("Invalid command: " + cmd);
         }
     }
 
-    private void filter(String cmd, boolean include) {
-        final Pattern pattern = Pattern.compile("([\\-\\w]+)\\s*([~/=])\\s*(.+)");
+    private void f(String field, String cmd, boolean include) {
+        final Pattern pattern = Pattern.compile("[ie]/(.+)/$");
         final Matcher matcher = pattern.matcher(cmd);
         if (!matcher.matches())
             throw new IllegalArgumentException("Invalid filter command: " + cmd);
 
-        String field = matcher.group(1);
-        String operator = matcher.group(2);
-        String value = matcher.group(3);
+        String regexp = matcher.group(1);
 
-        if ("/".equals(operator) && value.endsWith("/")) {
-            filterRegexp(field, value.substring(0, value.length() - 1), include);
-        } else if ("~".equals(operator)) {
-            filterIfContains(field, value, include);
-        } else if ("=".equals(operator)) {
-            filterIfEquals(field, value, include);
-        } else {
-            throw new IllegalArgumentException("Invalid filter command: " + cmd);
-        }
-    }
-
-    private void filterRegexp(String field, String regexp, boolean include) {
-        Pattern pattern = Pattern.compile(regexp);
+        Pattern pattern1 = Pattern.compile(regexp);
 
         entries.removeIf(entryMap -> {
             if (entryMap.get(field) == null) {
                 return include;
             }
-            return include ^ pattern.matcher((String) entryMap.get(field)).find();
+            return include ^ pattern1.matcher((String) entryMap.get(field)).find();
         });
-    }
-
-    private void filterIfEquals(String field, String csv, boolean include) {
-        Set<String> set = Arrays.stream(csv.split("\\|")).collect(Collectors.toSet());
-        boolean filterNull = "null".equals(csv);
-
-        entries.removeIf(entryMap -> {
-            if (entryMap.get(field) == null) {
-                if (filterNull)
-                    return false;
-                return include;
-            }
-            return include ^ set.contains(entryMap.get(field));
-        });
-    }
-
-    private void filterIfContains(String field, String csv, boolean include) {
-        boolean startsWith = csv.startsWith("^");
-        if (startsWith)
-            csv = csv.substring(1);
-
-        boolean endsWith = csv.endsWith("$");
-        if (endsWith)
-            csv = csv.substring(0, csv.length() - 1);
-
-        Set<String> set = Arrays.stream(csv.split("\\|")).collect(Collectors.toSet());
-
-        for (String s : set) {
-            entries.removeIf(entryMap -> {
-                if (entryMap.get(field) == null) {
-                    return !include;
-                } else if (!startsWith && !endsWith) {
-                    return include ^ entryMap.get(field).toString().contains(s);
-                } else if (startsWith && endsWith) {
-                    return include ^ (entryMap.get(field).toString().equals(s));
-                } else if (startsWith) {
-                    return include ^ entryMap.get(field).toString().startsWith(s);
-                } else {
-                    return include ^ entryMap.get(field).toString().endsWith(s);
-                }
-            });
-        }
     }
 
     void print(Set<Object> filter) {
@@ -387,19 +250,16 @@ public class XtreamList {
         }
     }
 
-    String stringJSON(Set<Object> filter) {
-        if (filter != null) {
-            List<Map<?, ?>> tmp = entries.stream().filter(e -> filter.contains(e.get("category_id"))).collect(Collectors.toList());
-            return new JSONArray(tmp).toString();
-        } else {
-            return new JSONArray(entries).toString();
-        }
+    String stringJSON() throws IOException {
+        update();
+        return new JSONArray(entries).toString();
     }
 
     // #EXTINF:-1 tvg-id="" tvg-name="AL - Baby Bandito (2024) S01 E08" tvg-logo="https://image.tmdb.org/t/p/w185/6vHSGeSrwD6FLqMumSz3fHmKJ2S.jpg" group-title="ALBANIA SERIALE",AL - Baby Bandito (2024) S01 E08
     // http://cf.pro-cdn.me:80/series/48833fd7865b/a5700ffdf3/772734.mp4
 
-    String stringM3U(XtreamList categories, String url, String postfix) {
+    String stringM3U(XtreamList categories, String url, String postfix) throws IOException {
+        update();
         Map<String, String> filter = categories.getAll("category_id", "category_name");
         List<Map<?, ?>> tmp = entries.stream().filter(e -> filter.containsKey(e.get("category_id"))).collect(Collectors.toList());
         return "#EXTM3U\n" + tmp.stream().map(e -> "#EXTINF:-1 tvg-id=\"\" tvg-name=\"" + e.get("name") + "\" tvg-logo=\"" + e.get("stream_icon") + "\" group-title=\"" + filter.get(e.get("category_id")) + "\"," + e.get("name") + "\n" + HttpClient.mkUrl(url) + e.get("stream_type") + postfix + e.get("stream_id") + ".ts").collect(Collectors.joining("\n"));
@@ -410,6 +270,7 @@ public class XtreamList {
     }
 
     public Set<Object> getAll(String field) {
+        //System.err.println(entries.stream().map(map -> map.get(field)).collect(Collectors.toSet()));
         return entries.stream().map(map -> map.get(field)).collect(Collectors.toSet());
     }
 
@@ -423,5 +284,28 @@ public class XtreamList {
 
     public int size() {
         return entries.size();
+    }
+
+    public XtreamList applyFilter() {
+        if (_filter != null) {
+            for (String n : _filter.keySet()) {
+                for (String cmdStr : _filter.get(n)) {
+                    cmd(n, cmdStr);
+                }
+            }
+        }
+        AtomicInteger counter = new AtomicInteger(1);
+        entries.forEach(row -> row.put("num", counter.getAndIncrement()));
+
+        if (parentList == null) {
+            entriesMap = entries.stream()
+                    .collect(Collectors.toMap(
+                            row -> (String) row.get("category_id"),
+                            row -> row
+                    ));
+        } else {
+            entriesMap = null;
+        }
+        return this;
     }
 }

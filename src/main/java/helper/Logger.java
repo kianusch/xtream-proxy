@@ -2,6 +2,8 @@ package helper;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
 public final class Logger {
@@ -63,17 +65,21 @@ public final class Logger {
     }
 
     private static void log(Level messageLevel, String message, Object... args) {
+        String now = LocalDateTime.now().format( DateTimeFormatter.ofPattern("DDD.HHmmss.SSS") );
+        //String now = LocalDateTime.now().format( DateTimeFormatter.ofPattern("DDD.HHmmss.SSS") );
+
         Level currentLevel = level;
 
         if (!messageLevel.isEnabled(currentLevel)) {
             return;
         }
 
+                // .append(Duration.between(START, Instant.now()).toSeconds())
         StringBuilder sb = new StringBuilder(message.length() + 48);
         sb.append('[')
                 .append(messageLevel)
                 .append("@")
-                .append(Duration.between(START, Instant.now()).toSeconds())
+                .append(now)
                 .append("] ");
 
         appendFormatted(sb, message, args);

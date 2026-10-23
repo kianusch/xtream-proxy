@@ -1,5 +1,7 @@
 package my.xtream;
 
+import helper.Logger;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -29,6 +31,7 @@ public final class HttpClient {
     }
 
     public static String getFromHttp(String url) throws IOException, InterruptedException {
+        Logger.info("HTTP Access -> {}",url);
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(30))
                 .GET()
