@@ -75,7 +75,7 @@ vod_categories
    i/^.*/
 live_categories
   category_name
-   i/^(CH|AT|DE|IR|FOR ADULTS)([|] |$)/
+   i/^(DE)([|] |$)/
    e/(?i)((sport|dazn|dyn|staige|prime|formula 1)|((rtl|disney|discovery)[+]) ppv|bundesliga|soccer|football|inf|sfl)/
 live_streams
   epg_channel_id
@@ -128,7 +128,6 @@ live_streams
    // =${uplink}/live/${username}/${password}/${stream_id}.ts
   stream_icon
    s/~category_name/^(DE|AT)[|] /https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${name}-de.png/
-   s/name/^(ORF|ATV|PULS|TIROL|W24|SERVUS|K19|R9|HITRADIO|KRONE|KRONEHIT|KURIER|KT1|K-TV|OKTO|OE24|(COMEDY CENTRAL|SIXX) AUSTRIA)/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/austria/${name}-at.png/
    s/name/^(?i)SKY.*(NATURE|DOCUMENTARIES|CLASSICS)/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${}-alt-de.png/
    s/-hd-alt/-alt/
    s/((?<!hd)\/[a-z0-9][^\/]*-hd-de[.]png)/\/hd$1/
