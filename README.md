@@ -50,89 +50,103 @@ Enjoy a more personalized IPTV experience! 🎉
 ---
 
 ## ⚙️ Configuration Example (`xtream.json`)
+The are two configuration files - one for the base configuration (xtream.cfg) and a second one for the filter (xtream.filter)
 
 Below is an example configuration file for `xtream-proxy`.  
 > **Note:** To retain the EPG link from your provider, remove the `epg` line from the configuration.
 
 ```json
 {
-  "provider": "https://provider.foo.bar",
+  "epg": "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz",
+  "epg.de": "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz",
+  "epg.at": "https://epgshare01.online/epgshare01/epg_ripper_AT1.xml.gz",
+  "provider": "https://xxx.foo.bar",
   "keep_uplink": true,
-  "me": "http://192.168.2.16:25461",
-  "cfg": {
-    "series_categories": [
-      "include category_name/^.*/"
-    ],
-    "vod_categories": [
-      "include category_name/^.*/"
-    ],
-    "live_categories": [
-      "include category_name/^(CH|AT|DE|IR|FOR ADULTS)([|] |$)/",
-      "exclude category_name/(?i)((sport|dazn|dyn|staige|prime|formula 1)|((rtl|disney|discovery)[+]) ppv|bundesliga|soccer|football|inf|sfl)/"
-    ],
-    "live_streams": [
-      "noop replace ~category_name/^(.*)[|].*$/$1/",
-      "replace name/\\s+$//",
-      "exclude name/(UHD|ᵁᴴᴰ|DAZN)/",
-      "exclude name/(?i)sport/",
-      "exclude name/^###/",
-      "replace epg_channel_id/.+//",
-      "replace name/^..:\\s+//",
-      "replace name/^(?:ADULT|JOYN|SKYGO|WOW|PRIME|PLAY[+]):\\s+//",
-      "replace name/\\s+(ⱽᴵᴾ|ᴳᴼᴸᴰ|ᴿᴬᵂ|RAW|4K|\\(720P\\)|HEVC|\\(SAT\\)|\\(LOW\\s*BIT\\))//",
-      "replace name/\\b(SKY.*HD)/$1_/",
-      "replace name/ᴴᴰ ◉/HD_/",
-      "replace name/\\bHD$//",
-      "replace name/\\bHD_$/HD/",
-      "replace name/^(ZDF)\\B/$1 /",
-      "replace name/^ORF\\sEINS/ORF1/",
-      "replace name/^ORF\\sIII/ORF3/",
-      "replace name/^ORF\\s(1|2|3)\\b/ORF$1/",
-      "replace name/^(ORF)2\\s(.*)/$1 $2/",
-      "replace name/^((RTL|VOX)\\B|SAT)[ .]?/$1 /",
-      "replace name/^(RTL) 2/$1 ZWEI/",
-      "replace name/^(KABEL) 1/$1 EINS/",
-      "replace name/^(PULS|ATV)\\s+/$1/",
-      "replace name/^PROSIEBEN/PRO SIEBEN/",
-      "replace name/^NAT GEO$/NATIONAL GEOGRAPHIC/",
-      "replace name/^([\\w][\\w]+)[,-.]?TV\\b/$1 TV/",
-      "replace name/^(WARNER.*)\\sHD$/$1/",
-      "replace name/\\b(CINEMA )(HIGHLIGHTS?|SPECIAL)(\\sHD)?$/$1BLOCKBUSTER$3/",
-      "replace name/(SUPER)\\s(RTL)/$2 $1/",
-      "replace name/(ᴴᴰ|ᶠ)//",
-      "replace name/[\\s-]+$//",
-      "replace name/\\b(PREMIERE)N( HD)?$/$1$2/",
-      "replace name/NTRO/NITRO/",
-      "replace name/(CRIME) ?[+] ?(INVESTIGATION)/$1 & $2/",
-      "replace name/^(WDR|NDR|MDR|RBB|SWR|BR FERNSEHEN) HD/$1/",
-      "replace name/\\b(SKY CINEMA) FAMILY\\b/$1 FEELGOOD/",
-      "set ~category_name/^(DE|AT)[|] / stream_icon/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${name}-de.png/",
-      "set name/^(ORF|ATV|PULS|TIROL|W24|SERVUS|K19|R9|KRONE|KRONEHIT|KURIER|K-TV|OKTO|(COMEDY CENTRAL|SIXX) AUSTRIA)/ stream_icon/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/austria/${name}-at.png/",
-      "set name/(?i)^SKY.*HD$/ stream_icon/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/hd/${}-de.png/",
-      "noop set name/(?i)^RTL / stream_icon/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${}-de.png/",
-      "set name/^(?i)SKY.*(NATURE|DOCUMENTARIES|CLASSICS)/ stream_icon/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${}-alt-de.png/",
-      "replace stream_icon/-hd-alt/-alt/",
-      "replace stream_icon/-tv-hd/-tv/",
-      "replace stream_icon/[&]/and/",
-      "replace stream_icon/[+]/plus/",
-      "replace stream_icon/rtl-(nitro-)/$1/",
-      "replace stream_icon/-austria-de[.]png$/-de.png/",
-      "replace stream_icon/hd.(sky-replay)-hd/$1/",
-      "replace stream_icon/\\b(sky-cinema)-feelgood\\b/$1-family/",
-      "replace stream_icon/\\b(sky-cinema)-blockbuster\\b/$1-highlights/",
-      "replace stream_icon/-de(-de)/$1/",
-      "replace stream_icon/\\b(orf2)\\w\\w?-at/$1-at/",
-      "replace stream_icon/crime-and-investigation-hd-de.png/crime-and-investigation-de.png/",
-      "replace stream_icon/(orf-)n.(-at)/$1niederosterreich$2/",
-      "deumlaut stream_icon",
-
-      "noop"
-    ]
-  }
+  "me": "http://192.168.1.1:25461"
 }
 ```
 
+```text
+series_categories
+  category_name
+   i/^.*/
+vod_categories
+  category_name
+   i/^.*/
+live_categories
+  category_name
+   i/^(CH|AT|DE|IR|FOR ADULTS)([|] |$)/
+   e/(?i)((sport|dazn|dyn|staige|prime|formula 1)|((rtl|disney|discovery)[+]) ppv|bundesliga|soccer|football|inf|sfl)/
+live_streams
+  epg_channel_id
+   s/.+//
+  name
+   s/\s+$//
+   e/(UHD|ᵁᴴᴰ|DAZN)/
+   e/(?i)sport/
+   e/^###/
+   s/^..:\s+//
+   s/^(?:ADULT|JOYN|SKYGO|WOW|PRIME|PLAY[+]):\s+//
+   s/\s+(ⱽᴵᴾ|ᴳᴼᴸᴰ|ᴿᴬᵂ|RAW|4K|\(720P\)|HEVC|\(SAT\)|\(LOW\s*BIT\))//
+   s/ *(?:ᴴᴰ|ᶠ|ᴴᴰ ◉|◉)//
+   s/^((?:SKY|COMEDY|SERVUS).*HD)/$1_/
+   s/^((?:UNIVERSAL|RED).*)/$1_/
+   s/^(ZDF|ORF)\B/$1 /
+   s/^(ORF)\sEINS/$1 1/
+   s/^(ORF)\sIII/$1 3/
+   s/^(ORF\s.+)(?:\sHD)$/$1/
+   s/^(ORF)(?:\s2\s?)(.+)$/$1 $2/
+   s/^((RTL|VOX)\B|SAT)[ .]?/$1 /
+   s/^(RTL) 2/$1 ZWEI/
+   s/^(KABEL) 1/$1 EINS/
+   s/^(PULS|ATV)\s+/$1/
+   s/^PROSIEBEN/PRO SIEBEN/
+   s/^NAT GEO$/NATIONAL GEOGRAPHIC/
+   s/^(NAT)IONAL (GEO)GRAPHIC (WILD)$/$1 $2 $3/
+   s/^([\w][\w]+)[,-.]?TV\b/$1 TV/
+   // replace name/^(WARNER.*)\sHD$/$1/
+   s/(?:\s|\B)HD(\s|$)/$1/
+   s/\bHD_$/HD/
+   s/\b(CINEMA )(HIGHLIGHTS?|SPECIAL)(\sHD)?$/$1BLOCKBUSTER$3/
+   s/(SUPER)\s(RTL)/$2 $1/
+   s/\b(PREMIERE)N( HD)?$/$1$2/
+   s/NTRO/NITRO/
+   s/(CRIME) ?[+] ?(INVESTIGATION)/$1 & $2/
+   // replace name/^(WDR|NDR|MDR|RBB|SWR|BR FERNSEHEN) HD/$1/
+   s/\b(SKY CINEMA) FAMILY\b/$1 FEELGOOD/
+   s/^(GEO) TELEVISION$/$1/
+   s/^(OE)\s(24)\sTV$/$1$2/
+   // replace name/^(OE24|KINOWELT) TV$/$1/
+   s/\s+TV$//
+   s/^(N)-(TV)$/NTV/
+   s/^(RED)(BULL)(TV_)$/$1 $2 $3/
+   s/^(HITRADIO O)E(3)$/$1$2/
+   s/^(HISTORY) .*/$1/
+   s/^(SERVUS).*/$1 TV/
+   s/\B_$//
+  // direct_source
+   // =${uplink}/live/${username}/${password}/${stream_id}.ts
+  stream_icon
+   s/~category_name/^(DE|AT)[|] /https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${name}-de.png/
+   s/name/^(ORF|ATV|PULS|TIROL|W24|SERVUS|K19|R9|HITRADIO|KRONE|KRONEHIT|KURIER|KT1|K-TV|OKTO|OE24|(COMEDY CENTRAL|SIXX) AUSTRIA)/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/austria/${name}-at.png/
+   s/name/^(?i)SKY.*(NATURE|DOCUMENTARIES|CLASSICS)/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${}-alt-de.png/
+   s/-hd-alt/-alt/
+   s/((?<!hd)\/[a-z0-9][^\/]*-hd-de[.]png)/\/hd$1/
+   s/[&]/and/
+   s/[+]/plus/
+   s/rtl-(nitro-)/$1/
+   s/-austria-de[.]png$/-de.png/
+   s/hd.(sky-replay)-hd/$1/
+   s/\b(sky-cinema)-feelgood\b/$1-family/
+   s/\b(sky-cinema)-blockbuster\b/$1-highlights/
+   s/-de(-de)/$1/
+   // replace stream_icon/crime-and-investigation-hd-de.png/crime-and-investigation-de.png/
+   s/(orf-)n..?(-at)/$1niederosterreich$2/
+   s/(orf)(?:-)([123]-at)/$1$2/
+   deumlaut
+```
 ---
+
 
 ## 🛠 Features Explained
 
