@@ -11,30 +11,13 @@ repositories {
 
 dependencies {
     implementation 'org.json:json:20260814'
-    implementation "org.yaml:snakeyaml:2.7"
 }
 
-configurations.all {
-    exclude group: "ch.qos.logback", module: "logback-classic"
-}
-
-tasks.register('copyRuntimeDependencies') {
-    group = "Build"
-    description = "Copies all runtime dependencies to the build/libs directory"
-
-    doLast {
-        def libsDir = file("$buildDir/libs")
-        libsDir.mkdirs()
-
-        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.each { artifact ->
-            copy {
-                from artifact.file
-                into libsDir
-            }
-        }
-    }
+tasks.register('copyToLib', Copy) {
+    into layout.buildDirectory.dir("libs")
+    from configurations.runtimeClasspath
 }
 
 tasks.named('build') {
-    finalizedBy 'copyRuntimeDependencies'
+    finalizedBy 'copyToLib'
 }
