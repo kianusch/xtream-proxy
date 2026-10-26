@@ -58,7 +58,8 @@ public class Filter {
 
     static private void ms(String mField, String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList) {
         // first try ... S/MATCHFIELD/MATCHPATTERN/MATCH/DST/
-        final Pattern pattern4 = Pattern.compile("^ms/([^/]*)/([^/]*)/(.+)/$");
+        // final Pattern pattern4 = Pattern.compile("^ms/([^/]*)/([^/]*)/(.+)/$");
+        final Pattern pattern4 = Pattern.compile("^ms/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/((?:[^/\\\\]|\\\\.)*)/$");
         final Matcher matcher4 = pattern4.matcher(cmd);
 
         if (matcher4.matches()) {
