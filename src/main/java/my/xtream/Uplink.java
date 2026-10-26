@@ -1,14 +1,14 @@
 package my.xtream;
 
 import helper.Logger;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 public class Uplink {
-    // private String header;
     private final Map<String, XtreamList> xtreamLists = new HashMap<>();
     private final Metadata metadata;
     private final String epg;
@@ -17,34 +17,30 @@ public class Uplink {
     private final String username;
     private final String password;
 
-    private final static Map<String, String> PARENTNAMES = Map.of(
+    private static final Map<String, String> PARENTNAMES = Map.of(
             "live_streams", "live_categories",
             "series", "series_categories",
             "vod_streams", "vod_categories");
 
-    Uplink(JSONObject cfg, String username, String password, Filter filter) throws IOException {
-        if (cfg.has("epg"))
-            epg = cfg.getString("epg");
-        else
-            epg = null;
+    Uplink(Properties cfg, String username, String password, Filter filter) throws IOException {
+        String epgSetting = cfg.getProperty("epg");
+        epg = epgSetting != null && !epgSetting.isBlank() ? epgSetting : null;
 
-        String prvdr = cfg.getString("provider");
+        String prvdr = cfg.getProperty("provider");
         String upstream;
 
         if (prvdr.startsWith("http")) {
             upstream = prvdr + "/player_api.php?username=" + username + "&password=" + password;
+            Logger.info("Reading: metadata from {}", prvdr);
         } else {
-            upstream = prvdr;
+            upstream = prvdr + ".metadata";
         }
-        Logger.info("Reading: metadata from {}", prvdr);
-        if (upstream.startsWith("http"))
-            metadata = new Metadata(upstream);
-        else
-            metadata = new Metadata(upstream + ".metadata");
+
+        metadata = new Metadata(upstream);
 
         String r_url, r_protocol, r_port;
 
-        if (cfg.has("keep_uplink") && cfg.getBoolean("keep_uplink")) {
+        if (Boolean.parseBoolean(cfg.getProperty("keep_uplink", "false"))) {
             URI uri = URI.create(prvdr);
             r_protocol = uri.getScheme();
             r_url = uri.getHost();
@@ -73,7 +69,7 @@ public class Uplink {
         }
         streamPostFix = "/" + metadata.getUserInfo("username") + "/" + metadata.getUserInfo("password") + "/";
 
-        URI uri = URI.create(cfg.getString("me"));
+        URI uri = URI.create(cfg.getProperty("me"));
         String m_url = uri.getHost();
         metadata.putServerInfo("url", m_url);
         String m_protocol = uri.getScheme();
@@ -93,15 +89,15 @@ public class Uplink {
         this.username = metadata.getUserInfo("username");
         this.password = metadata.getUserInfo("password");
 
-        for (String s: PARENTNAMES.keySet()) {
-            String p=PARENTNAMES.get(s);
-            XtreamList pt=new XtreamList(null, filter.get(p),p, uplink, username, password);
-            xtreamLists.put(p,pt);
-            xtreamLists.put(s,new XtreamList(pt, filter.get(s), s, uplink, username, password));
+        for (String s : PARENTNAMES.keySet()) {
+            String p = PARENTNAMES.get(s);
+            XtreamList pt = new XtreamList(null, filter.get(p), p, uplink, username, password);
+            xtreamLists.put(p, pt);
+            xtreamLists.put(s, new XtreamList(pt, filter.get(s), s, uplink, username, password));
         }
-        for (String s: filter.keySet()) {
+        for (String s : filter.keySet()) {
             if (!xtreamLists.containsKey(s)) {
-                xtreamLists.put(s,new XtreamList(null, filter.get(s), s, uplink, username, password));
+                xtreamLists.put(s, new XtreamList(null, filter.get(s), s, uplink, username, password));
             }
         }
     }
@@ -111,12 +107,12 @@ public class Uplink {
     }
 
     public void reset(Filter filter) {
-        for (String s: filter.keySet()) {
+        for (String s : filter.keySet()) {
             if (xtreamLists.containsKey(s)) {
                 Logger.info("Updating: {}", s);
                 xtreamLists.get(s).reset(filter.get(s));
             } else {
-                xtreamLists.put(s,new XtreamList(null, filter.get(s), s, uplink,  username, password));
+                xtreamLists.put(s, new XtreamList(null, filter.get(s), s, uplink, username, password));
             }
         }
     }
@@ -125,7 +121,7 @@ public class Uplink {
         if (cmd == null) {
             return metadata.stringJSON();
         } else if (cmd.startsWith("get_") && xtreamLists.containsKey(cmd.substring(4))) {
-            return xtreamLists.get( cmd.substring(4) ).stringJSON();
+            return xtreamLists.get(cmd.substring(4)).stringJSON();
         }
         return null;
     }
@@ -142,5 +138,4 @@ public class Uplink {
         String query = rawQuery == null ? "" : "?" + rawQuery;
         return uplink + path + query;
     }
-
 }

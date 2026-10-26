@@ -34,7 +34,7 @@ This tool requires a valid IPTV stream subscription. Ensure your subscription is
 
 1. Obtain valid XTREAM credentials from your IPTV provider.
 2. Configure `xtream-proxy` with your credentials and settings.
-3. Define filtering and manipulation rules in the configuration file (`xtream.json`).
+3. Define filtering and manipulation rules in the configuration file (`xtream.properties`).
 4. Use the generated playlist in your IPTV player.
 
 Run this Programm on your PC ...
@@ -49,21 +49,19 @@ Enjoy a more personalized IPTV experience! 🎉
 
 ---
 
-## ⚙️ Configuration Example (`xtream.json`)
-The are two configuration files - one for the base configuration (xtream.cfg) and a second one for the filter (xtream.filter)
+## ⚙️ Configuration Example (`xtream.properties`)
+There are two configuration files: the base configuration (`xtream.properties`) and a filter file (`xtream.filter`).
 
 Below is an example configuration file for `xtream-proxy`.  
 > **Note:** To retain the EPG link from your provider, remove the `epg` line from the configuration.
 
-```json
-{
-  "epg": "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz",
-  "epg.de": "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz",
-  "epg.at": "https://epgshare01.online/epgshare01/epg_ripper_AT1.xml.gz",
-  "provider": "https://xxx.foo.bar",
-  "keep_uplink": true,
-  "me": "http://192.168.1.1:25461"
-}
+```properties
+epg=https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz
+epg.de=https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz
+epg.at=https://epgshare01.online/epgshare01/epg_ripper_AT1.xml.gz
+provider=https://xxx.foo.bar
+keep_uplink=true
+me=http://192.168.1.1:25461
 ```
 
 ```text

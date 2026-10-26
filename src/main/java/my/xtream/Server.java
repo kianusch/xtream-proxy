@@ -8,12 +8,13 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import helper.Logger;
-import org.json.JSONObject;
 
 public class Server {
     private final Map<String, Uplink> xtreams=new HashMap<>();
@@ -21,7 +22,7 @@ public class Server {
     private final String cfgFile;
     private int port;
 
-    private JSONObject _cfg;
+    private Properties _cfg;
     private Filter _filter;
 
     Server(String cfgFile) throws IOException {
@@ -30,7 +31,7 @@ public class Server {
             readCfg();
             readFilter();
         } else {
-            throw new RuntimeException("Config File must end with .cfg");
+            throw new RuntimeException("Config file must end with .cfg");
         }
     }
 
@@ -39,10 +40,21 @@ public class Server {
     }
 
     void readCfg() throws IOException {
-        _cfg = new JSONObject(HttpClient.get(this.cfgFile+".cfg"));
-        // _rootCfg = new YAML(cfgPath+".yml");
+        _cfg = new Properties();
+        String baseFile = this.cfgFile;
 
-        URI uri = URI.create(_cfg.getString("me"));
+            Path path = Path.of(baseFile + ".cfg");
+            if (Files.exists(path)) {
+                try (var reader = new java.io.StringReader( Files.readString(path))) {
+                    _cfg.load(reader);
+                }
+            }
+
+        if (_cfg.isEmpty()) {
+            throw new IOException("No config file found for: " + baseFile + ".cfg");
+        }
+
+        URI uri = URI.create(_cfg.getProperty("me"));
 
         String protocol = uri.getScheme();
 
@@ -140,10 +152,10 @@ public class Server {
 
         if (username == null || password == null) {
             if ("/get.epg".equals(path)) {
-                Logger.info("Redirect -> {}", _cfg.getString("epg."+rawQuery));
-                redirect(exchange, _cfg.getString("epg."+rawQuery));
+                Logger.info("Redirect -> {}", _cfg.getProperty("epg." + rawQuery));
+                redirect(exchange, _cfg.getProperty("epg." + rawQuery));
             } else {
-                String r = _cfg.getString("provider");
+                String r = _cfg.getProperty("provider");
                 Logger.info("Redirect -> {} ", redirectTarget(r, path, rawQuery));
                 redirect(exchange, redirectTarget(r, path, rawQuery));
             }

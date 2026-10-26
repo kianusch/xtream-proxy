@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.regex.Pattern;
@@ -22,9 +20,7 @@ public final class HttpClient {
 
     public static String get(String filePath) throws IOException {
         try {
-            return filePath.startsWith("http")
-                    ? getFromHttp(mkUrl(filePath))
-                    : getFromFile(filePath);
+            return getFromHttp(mkUrl(filePath));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -45,10 +41,6 @@ public final class HttpClient {
         }
 
         return response.body();
-    }
-
-    public static String getFromFile(String filePath) throws IOException {
-        return Files.readString(Path.of(filePath));
     }
 
     static String mkUrl(String str) {

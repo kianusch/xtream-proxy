@@ -1,0 +1,87 @@
+series_categories
+  category_name
+   i/^.*/
+vod_categories
+  category_name
+   i/^.*/
+live_categories
+  category_name
+   i/^(DE|AT|IR|CH)([|] |$)/
+   e/(?i)((sport|dazn|dyn|staige|prime|formula 1)|((rtl|disney|discovery)[+]) ppv|bundesliga|soccer|football|inf|sfl)/
+live_streams
+  epg_channel_id
+   s/.+//
+  category_name.name
+   s/\s+$//
+   e/(UHD|ᵁᴴᴰ|DAZN)/
+   e/(?i)sport/
+   e/^###/
+   s/\s+(ⱽᴵᴾ|ᴳᴼᴸᴰ|ᴿᴬᵂ|RAW|4K|\(720P\)|HEVC|\(SAT\)|\(LOW\s*BIT\))//
+   s/\s*(?:ᴴᴰ|ᶠ|ᴴᴰ ◉|◉)//
+   s/^(?:..|ADULT|JOYN|SKYGO|WOW|PRIME|PLAY[+]):\s+//
+
+   // s/^((?:ORF|ZDF|COMEDY CENTRAL|(?:SUPER )?RTL|VOX|SAT|KABEL|PROSIEBEN).*)\sHD$/$1/
+   s/^((?:ORF|ZDF|UNIVERSAL|WARNER|RTL|VOX|3?SAT|KABEL|PROSIEBEN).*)\sHD$/$1/
+   s/^([WNM]DR)\sHD/$1/
+
+   ms/AT[|] .*/^(ORF)\B/$1 /
+   ms/AT[|] .*/^(ORF)(?:\s2\s?)(.+)$/$1 $2/
+   ms/AT[|] .*/^(ORF)\sEINS/$1 1/
+
+   ms/AT[|] .*/^(?:(SAT)\s1)/$1.1/
+   ms/DE[|] .*/^(?:(ZDF)\s)/$1/
+   ms/DE[|] .*/^(?:(RTL|VOX)\s(UP|ZWEI))/$1$2/
+   ms/AT[|] .*/^((?:RTL|VOX).*)\sAUSTRIA/$1/
+   ms/DE[|] .*/^(KABEL)\s1$/$1 EINS/
+   ms/DE[|] .*/^(SKY (?:ATLANTIC|CINEMA (?:CLASSICS|HIGHLIGHTS)))$/$1 HD/
+   ms/DE[|] .*/^(WARNER)(TV)/$1 $2/
+  name
+   s/^(SKY (?:CRIME|DOCUMENTARIES|KRIMI|NATURE|ONE|CINEMA (?:THRILLER|SPECIAL|PREMIEREN [+]24)))\sHD$/$1/
+  name
+   s/^(?:(SERVUS)\s?(TV))(:?\s.*HD)?$/$1 $2/
+
+   // s/^((?:COMEDY|SERVUS).*HD)/$1_/
+   // s/^((?:UNIVERSAL|RED).*)/$1_/
+   // s/^(PULS|ATV)\s+/$1/
+   // s/^NAT GEO$/NATIONAL GEOGRAPHIC/
+   // s/^(NAT)IONAL (GEO)GRAPHIC (WILD)$/$1 $2 $3/
+   // s/^([\w][\w]+)[,-.]?TV\b/$1 TV/
+   // // replace name/^(WARNER.*)\sHD$/$1/
+   // // s/(?:\s|\B)HD(\s|$)/$1/
+   // // s/\bHD_$/HD/
+   // s/\b(CINEMA )(HIGHLIGHTS?|SPECIAL)(\sHD)?$/$1BLOCKBUSTER$3/
+   // s/\b(PREMIERE)N( HD)?$/$1$2/
+   // s/NTRO/NITRO/
+   // s/(CRIME) ?[+] ?(INVESTIGATION)/$1 & $2/
+   // // replace name/^(WDR|NDR|MDR|RBB|SWR|BR FERNSEHEN) HD/$1/
+   // s/\b(SKY CINEMA) FAMILY\b/$1 FEELGOOD/
+   // s/^(GEO) TELEVISION$/$1/
+   // s/^(OE)\s(24)\sTV$/$1$2/
+   // // replace name/^(OE24|KINOWELT) TV$/$1/
+   // s/\s+TV$//
+   // s/^(N)-(TV)$/NTV/
+   // s/^(RED)(BULL)(TV_)$/$1 $2 $3/
+   // s/^(HITRADIO O)E(3)$/$1$2/
+   // s/^(HISTORY) .*/$1/
+   // s/^(SERVUS).*/$1 TV/
+  // direct_source
+   // =${uplink}/live/${username}/${password}/${stream_id}.ts
+  category_name.stream_icon
+   ma/DE[|] .*/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${name}-de.png/
+   ma/AT[|] .*/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/austria/${name}-at.png/
+  name.stream_icon
+   //ma/^(?i)SKY.*(NATURE|DOCUMENTARIES|CLASSICS) .*/https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/germany/${}-alt-de.png/
+   s/-hd-alt/-alt/
+   s/((?<!hd)\/[a-z0-9][^\/]*-hd-de[.]png)/\/hd$1/
+   s/[&]/and/
+   s/[+]/plus/
+   s/rtl-(nitro-)/$1/
+   s/-austria-de[.]png$/-de.png/
+   s/hd.(sky-replay)-hd/$1/
+   s/\b(sky-cinema)-feelgood\b/$1-family/
+   s/\b(sky-cinema)-blockbuster\b/$1-highlights/
+   s/-de(-de)/$1/
+   // replace stream_icon/crime-and-investigation-hd-de.png/crime-and-investigation-de.png/
+   s/(orf-)n..?(-at)/$1niederosterreich$2/
+   s/(orf)(?:-)([123]-at)/$1$2/
+   deumlaut
