@@ -22,11 +22,11 @@ public class Uplink {
             "series", "series_categories",
             "vod_streams", "vod_categories");
 
-    Uplink(Properties cfg, String username, String password, Filter filter) throws IOException {
+    Uplink(Properties cfg, String srv, String username, String password, Filter filter) throws IOException {
         String epgSetting = cfg.getProperty("epg");
         epg = epgSetting != null && !epgSetting.isBlank() ? epgSetting : null;
 
-        String prvdr = cfg.getProperty("provider");
+        String prvdr = srv==null?cfg.getProperty("provider"):srv;
         String upstream;
 
         if (prvdr.startsWith("http")) {

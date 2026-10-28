@@ -103,12 +103,41 @@ public class Server {
     private void handle(HttpExchange exchange) throws IOException {
         try {
             String method = exchange.getRequestMethod();
-            String path = exchange.getRequestURI().getPath();
+            String raw = exchange.getRequestURI().getPath();
+            String path=null;
+            String srv=null;
+
+            // String raw = getPath(); // "/fqdn.foo.bar/bla.php?lksdjf&laskdj&kasjd"
+
+            if (raw != null && raw.startsWith("/http")) {
+                int qPos = raw.indexOf('?');
+                String pathPart = (qPos >= 0) ? raw.substring(0, qPos) : raw;
+                int f=1;
+                if (raw.startsWith("/http://")) {
+                    f=8;
+                }
+                if (raw.startsWith("/https://")) {
+                    f=8;
+                }
+                int firstSlash = pathPart.indexOf('/', f); // first slash after the initial "/"
+
+                if (firstSlash > 0) {
+                    srv = pathPart.substring(1, firstSlash); // "fqdn.foo.bar"
+                    if (srv.contains(".")) {
+                        path = pathPart.substring(firstSlash) + ((qPos >= 0) ? raw.substring(qPos) : "");
+                    } else {
+                        srv = null;
+                        path = raw;
+                    }
+                }
+            } else {
+                path = raw;
+            }
 
             switch (method) {
-                case "HEAD" -> processHead(exchange, path);
+                case "HEAD" -> processHead(exchange, path, srv);
 
-                case "GET" -> processGet(exchange, path);
+                case "GET" -> processGet(exchange, path, srv);
 
                 default -> sendStatus(exchange, 405);
             }
@@ -121,7 +150,7 @@ public class Server {
         }
     }
 
-    private void processHead(HttpExchange exchange, String path) throws IOException {
+    private void processHead(HttpExchange exchange, String path, String srv) throws IOException {
         if ("/generate_204".equals(path)) {
             String ip = clientIp(exchange);
 
@@ -133,7 +162,7 @@ public class Server {
         }
     }
 
-    private void processGet(HttpExchange exchange, String path) throws IOException {
+    private void processGet(HttpExchange exchange, String path, String srv) throws IOException {
         if ( "/reload".equals(path)) {
             reset();
             sendStatus(exchange, 200);
@@ -155,15 +184,15 @@ public class Server {
                 Logger.info("Redirect -> {}", _cfg.getProperty("epg." + rawQuery));
                 redirect(exchange, _cfg.getProperty("epg." + rawQuery));
             } else {
-                String r = _cfg.getProperty("provider");
-                Logger.info("Redirect -> {} ", redirectTarget(r, path, rawQuery));
-                redirect(exchange, redirectTarget(r, path, rawQuery));
+                String rd =redirectTarget( srv==null?_cfg.getProperty("provider"):srv , path, rawQuery);
+                Logger.info("Redirect -> {} ", rd);
+                redirect(exchange, rd);
             }
         } else {
             if (xtreams.containsKey(username)) {
                 xtream = xtreams.get(username);
             } else {
-                xtream = new Uplink(_cfg, username, password, _filter);
+                xtream = new Uplink(_cfg, srv, username, password, _filter);
                 xtreams.put(username, xtream);
             }
 
@@ -175,7 +204,7 @@ public class Server {
                 }
 
                 case "/player_api.php" -> {
-                    Logger.info("Action -> {} ? {}",path,rawQuery);
+                    Logger.info("Action -> {} / {} ? {}",srv, path,rawQuery);
                     if (action == null) {
                         try {
                             Thread.sleep(200);
