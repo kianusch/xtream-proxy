@@ -92,7 +92,7 @@ public class Filter {
         throw new IllegalArgumentException("Invalid filter: " + cmd);
     }
 
-    static private void ma(String mField, String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList) {
+    static private void ma(String mField, String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList, boolean u, boolean l, String tr) {
         // first try ... s/MATCHFIELD/MATCH/DST/
         final Pattern pattern3 = Pattern.compile("^ma/([^/]*)/(.+)/$");
         final Matcher matcher3 = pattern3.matcher(cmd);
@@ -118,15 +118,25 @@ public class Filter {
                 pMatcher.reset(condFileValue);
                 if (pMatcher.matches()) {
                     if (template != null) {
-                        String t;
+                        String t="";
                         if (template.isEmpty()) {
                             t = pIsParent
                                     ? (String) categories.get(mField)
                                     : (String) entryMap.get(mField);
                         } else {
                             t = (String) entryMap.get(template);
+                            if (t!=null) {
+                                if (u) {
+                                    t = t.toUpperCase();
+                                } else if (l) {
+                                    t = t.toLowerCase();
+                                }
+                                if (tr!=null) {
+                                    t = t.replace(" ", tr);
+                                }
+                            }
                         }
-                        String value = replacement.replace("${" + template + "}", t.toLowerCase().replace(" ", "-"));
+                        String value = replacement.replace("${" + template + "}", t);
                         entryMap.put(field, value);
                     } else {
                         entryMap.put(field, replacement);
@@ -139,7 +149,8 @@ public class Filter {
         Logger.error("Field: {}\nPreFilterField: {}\nFilter: {}", field, mField, cmd);
         throw new IllegalArgumentException("Invalid filter: " + cmd);
     }
-        static private void s(String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList) {
+
+    static private void s(String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList) {
         // ... s/MATCH/DST/
         final Pattern replacementsPattern = Pattern.compile("^s/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)*)/$");
         final Matcher replacementsMatcher = replacementsPattern.matcher(cmd);
@@ -196,10 +207,22 @@ public class Filter {
     }
 
     static void applyFilter(List<Map.Entry<String, String>> _filter, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList, String username, String password, String uplink) {
+        boolean u=false;
+        boolean l=false;
+        String tr=null;
+
         if (_filter != null) {
             String match = null;
             for (Map.Entry<String, String> n : _filter) {
                 String field = n.getKey();
+                if (field.contains(":")) {
+                    String flags=field.substring(field.indexOf(".") + 1);
+                    field = field.substring(0, field.indexOf(":"));
+                    u=flags.toLowerCase().contains("u");
+                    l=flags.toLowerCase().contains("l");
+                    if (flags.contains("~")) tr = ".";
+                    if (flags.contains("-")) tr = "-";
+                }
                 if (field.contains(".")) {
                     match = field.substring(0, field.indexOf("."));
                     field = field.substring(field.indexOf(".") + 1);
@@ -211,7 +234,7 @@ public class Filter {
                     case String s when s.startsWith("e/") -> f(field, cmdStr, entries);
                     case String s when s.startsWith("s/") -> s(field, cmdStr, entries, parentList);
                     case String s when s.startsWith("ms/") -> ms(match, field, cmdStr, entries, parentList);
-                    case String s when s.startsWith("ma/") -> ma(match, field, cmdStr, entries, parentList);
+                    case String s when s.startsWith("ma/") -> ma(match, field, cmdStr, entries, parentList,u,l,tr);
                     case String s when s.startsWith("=") -> assign(field, cmdStr, entries, username, password, uplink);
                     case "deumlaut" -> deUmlaut(field, entries);
                     default -> throw new IllegalArgumentException("Invalid command: " + cmdStr);
