@@ -38,7 +38,7 @@ public final class Logger {
         }
 
         try {
-            Logger.level = Level.valueOf(level);
+            Logger.level = Level.valueOf(level.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid log level: " + level, e);
         }

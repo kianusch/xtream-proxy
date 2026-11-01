@@ -9,7 +9,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 public class Filter {
     private static final Pattern UMLAUT_PATTERN = Pattern.compile("[ÄÖÜäöüß]");
@@ -92,7 +91,7 @@ public class Filter {
         throw new IllegalArgumentException("Invalid filter: " + cmd);
     }
 
-    static private void ma(String mField, String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList, boolean u, boolean l, String tr) {
+    static private void ma(String mField, String field, String cmd, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList, boolean u, boolean l, String tr, boolean cap) {
         // first try ... s/MATCHFIELD/MATCH/DST/
         final Pattern pattern3 = Pattern.compile("^ma/([^/]*)/(.+)/$");
         final Matcher matcher3 = pattern3.matcher(cmd);
@@ -118,25 +117,27 @@ public class Filter {
                 pMatcher.reset(condFileValue);
                 if (pMatcher.matches()) {
                     if (template != null) {
-                        String t="";
+                        String t;
                         if (template.isEmpty()) {
                             t = pIsParent
                                     ? (String) categories.get(mField)
                                     : (String) entryMap.get(mField);
                         } else {
                             t = (String) entryMap.get(template);
-                            if (t!=null) {
-                                if (u) {
+                            if (t != null) {
+                                if (cap) {
+                                    t = capitalize(t);
+                                } else if (u) {
                                     t = t.toUpperCase();
                                 } else if (l) {
                                     t = t.toLowerCase();
                                 }
-                                if (tr!=null) {
+                                if (tr != null) {
                                     t = t.replace(" ", tr);
                                 }
                             }
                         }
-                        String value = replacement.replace("${" + template + "}", t);
+                        String value = replacement.replace("${" + template + "}", t==null?"":t);
                         entryMap.put(field, value);
                     } else {
                         entryMap.put(field, replacement);
@@ -207,19 +208,21 @@ public class Filter {
     }
 
     static void applyFilter(List<Map.Entry<String, String>> _filter, List<Map<String, Object>> entries, Map<String, Map<String, Object>> parentList, String username, String password, String uplink) {
-        boolean u=false;
-        boolean l=false;
-        String tr=null;
+        boolean u = false;
+        boolean l = false;
+        String tr = null;
+        boolean cap = false;
 
         if (_filter != null) {
             String match = null;
             for (Map.Entry<String, String> n : _filter) {
                 String field = n.getKey();
                 if (field.contains(":")) {
-                    String flags=field.substring(field.indexOf(".") + 1);
+                    String flags = field.substring(field.indexOf(".") + 1);
                     field = field.substring(0, field.indexOf(":"));
-                    u=flags.toLowerCase().contains("u");
-                    l=flags.toLowerCase().contains("l");
+                    u = flags.toLowerCase().contains("u");
+                    l = flags.toLowerCase().contains("l");
+                    cap = flags.toLowerCase().contains("^");
                     if (flags.contains("~")) tr = ".";
                     if (flags.contains("-")) tr = "-";
                 }
@@ -234,7 +237,8 @@ public class Filter {
                     case String s when s.startsWith("e/") -> f(field, cmdStr, entries);
                     case String s when s.startsWith("s/") -> s(field, cmdStr, entries, parentList);
                     case String s when s.startsWith("ms/") -> ms(match, field, cmdStr, entries, parentList);
-                    case String s when s.startsWith("ma/") -> ma(match, field, cmdStr, entries, parentList,u,l,tr);
+                    case String s when s.startsWith("ma/") ->
+                            ma(match, field, cmdStr, entries, parentList, u, l, tr, cap);
                     case String s when s.startsWith("=") -> assign(field, cmdStr, entries, username, password, uplink);
                     case "deumlaut" -> deUmlaut(field, entries);
                     default -> throw new IllegalArgumentException("Invalid command: " + cmdStr);
@@ -245,8 +249,15 @@ public class Filter {
         }
     }
 
+    public static String capitalize(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+        return Pattern.compile("\\b(.)").matcher(input.toLowerCase())
+                .replaceAll(m -> m.group(1).toUpperCase());
+    }
 
-    List<Map.Entry<String, String>> get(String s) {
+    List<Map.Entry<String, String>> getFilter(String s) {
         return filter.get(s);
     }
 

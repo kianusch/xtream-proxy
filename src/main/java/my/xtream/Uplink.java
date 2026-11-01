@@ -91,13 +91,13 @@ public class Uplink {
 
         for (String s : PARENTNAMES.keySet()) {
             String p = PARENTNAMES.get(s);
-            XtreamList pt = new XtreamList(null, filter.get(p), p, uplink, username, password);
+            XtreamList pt = new XtreamList(null, filter.getFilter(p), p, uplink, username, password);
             xtreamLists.put(p, pt);
-            xtreamLists.put(s, new XtreamList(pt, filter.get(s), s, uplink, username, password));
+            xtreamLists.put(s, new XtreamList(pt, filter.getFilter(s), s, uplink, username, password));
         }
         for (String s : filter.keySet()) {
             if (!xtreamLists.containsKey(s)) {
-                xtreamLists.put(s, new XtreamList(null, filter.get(s), s, uplink, username, password));
+                xtreamLists.put(s, new XtreamList(null, filter.getFilter(s), s, uplink, username, password));
             }
         }
     }
@@ -110,10 +110,18 @@ public class Uplink {
         for (String s : filter.keySet()) {
             if (xtreamLists.containsKey(s)) {
                 Logger.info("Updating: {}", s);
-                xtreamLists.get(s).reset(filter.get(s));
+                xtreamLists.get(s).reset(filter.getFilter(s));
             } else {
-                xtreamLists.put(s, new XtreamList(null, filter.get(s), s, uplink, username, password));
+                xtreamLists.put(s, new XtreamList(null, filter.getFilter(s), s, uplink, username, password));
             }
+        }
+    }
+
+    public void resetAll() throws IOException {
+        for (var x:PARENTNAMES.entrySet()) {
+            xtreamLists.get(x.getValue()).mkDirty();
+            xtreamLists.get(x.getKey()).mkDirty();
+            xtreamLists.get(x.getKey()).update();
         }
     }
 

@@ -4,8 +4,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +20,6 @@ public class XtreamList {
     private Map<String, Map<String, Object>> entriesMap;
     private JSONArray orig;
     private List<Map.Entry<String, String>> _filter;
-    private Instant lastUpdate = Instant.EPOCH;
 
     XtreamList(XtreamList parent, List<Map.Entry<String, String>> _filter, String listname, String uplink, String username, String password) {
         this.uplink = uplink.endsWith("/") ? uplink.substring(0, uplink.length() - 1) : uplink;
@@ -39,14 +36,13 @@ public class XtreamList {
         return entries == null;
     }
 
+    void mkDirty() {
+        entries = null;
+    }
+
     void update() throws IOException {
         if (parentList != null && parentList.isDirty()) {
             parentList.update();
-            entries = null;
-        }
-
-        if (Duration.between(lastUpdate, Instant.now()).toSeconds() > 3600) {
-            orig = null;
             entries = null;
         }
 
@@ -54,7 +50,6 @@ public class XtreamList {
             if (orig == null) {
                 String ul = uplink + "/player_api.php?username=" + username + "&password=" + password + "&action=get_" + listname;
                 orig = new JSONArray(HttpClient.get(ul));
-                lastUpdate = Instant.now();
             }
 
             entries = filterAndCvt(orig);

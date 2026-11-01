@@ -15,9 +15,16 @@ import java.util.Map;
 import java.util.Properties;
 
 import helper.Logger;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Server {
-    private final Map<String, Uplink> xtreams=new HashMap<>();
+    private static final long ONE_TIME_DELAY_MS = TimeUnit.MINUTES.toMillis(1438);
+
+    private final Map<String, Uplink> xtreams = new HashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
     private volatile HttpServer httpServer;
     private final String cfgFile;
     private int port;
@@ -98,6 +105,7 @@ public class Server {
 
         httpServer = null;
         server.stop(delaySeconds);
+        scheduler.shutdownNow();
     }
 
     private void handle(HttpExchange exchange) throws IOException {
@@ -151,23 +159,30 @@ public class Server {
     }
 
     private void processHead(HttpExchange exchange, String path, String srv) throws IOException {
-        if ("/generate_204".equals(path)) {
-            String ip = clientIp(exchange);
-
-            System.err.println("CONNECTIVITY CHECK: " + ip + " -> " + path);
-
-            sendStatus(exchange, 204);
-        } else {
-            sendStatus(exchange, 404);
+        switch (path) {
+            case ("/generate_204") -> {
+                Logger.debug ("CONNECTIVITY CHECK: {}" + clientIp(exchange));
+                sendStatus(exchange, 204);
+            }
+            case "/reload" -> {
+                reset();
+                sendStatus(exchange, 200);
+            }
+            case "/setDebug" -> {
+                Logger.setLevel("debug");
+                sendStatus(exchange, 200);
+            }
+            case "/setInfo" -> {
+                Logger.setLevel("info");
+                sendStatus(exchange, 200);
+            }
+            case null, default -> {
+                sendStatus(exchange, 404);
+            }
         }
     }
 
     private void processGet(HttpExchange exchange, String path, String srv) throws IOException {
-        if ( "/reload".equals(path)) {
-            reset();
-            sendStatus(exchange, 200);
-            return;
-        }
 
         URI uri = exchange.getRequestURI();
         String rawQuery = uri.getRawQuery();
@@ -181,11 +196,9 @@ public class Server {
 
         if (username == null || password == null) {
             if ("/get.epg".equals(path)) {
-                Logger.info("Redirect -> {}", _cfg.getProperty("epg." + rawQuery));
                 redirect(exchange, _cfg.getProperty("epg." + rawQuery));
             } else {
                 String rd =redirectTarget( srv==null?_cfg.getProperty("provider"):srv , path, rawQuery);
-                Logger.info("Redirect -> {} ", rd);
                 redirect(exchange, rd);
             }
         } else {
@@ -199,20 +212,22 @@ public class Server {
             switch (path) {
                 case "/xmltv.php" -> {
                     String epg = xtream.getEPG();
-                    Logger.info("Redirect -> {} ",epg!=null?epg:xtream.redirectTarget(path, rawQuery));
                     redirect(exchange, epg != null ? epg : xtream.redirectTarget(path, rawQuery));
                 }
 
                 case "/player_api.php" -> {
                     Logger.info("Action -> {} / {} ? {}",srv, path,rawQuery);
-                    if (action == null) {
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
+                    //if (action == null) {
+                        //try {
+                            //Thread.sleep(200);
+                        //} catch (InterruptedException e) {
+                            //throw new RuntimeException(e);
+                        //}
+                    //}
                     String list = xtream.apiCmd(action);
+                    if (action != null && action.equals("get_live_streams")) {
+                             scheduleSingleDelayedAction(username, action, xtream);
+                    }
                     if (list==null) {
                         redirect(exchange, xtream.redirectTarget(path, rawQuery));
                     } else {
@@ -228,11 +243,21 @@ public class Server {
                 case "/" -> sendStatus(exchange, 401);
 
                 default -> {
-                    Logger.info("Redirect -> ",xtream.redirectTarget(path,rawQuery));
                     redirect(exchange, xtream.redirectTarget(path, rawQuery));
                 }
             }
         }
+    }
+
+    private void scheduleSingleDelayedAction(String username, String action, Uplink xtream) {
+        scheduler.schedule(() -> {
+            try {
+                Logger.info("Scheduled one-time action after 23h: {} ? action={}", username, action);
+                xtreams.get(username).resetAll();
+            } catch (Exception e) {
+                Logger.warn("Delayed action failed for {} / {}: {}", username, action, e.getMessage());
+            }
+        }, ONE_TIME_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
     private String redirectTarget(String host, String path, String rawQuery) {
@@ -286,22 +311,13 @@ public class Server {
                 : address.getHostAddress();
     }
 
-    private static void redirect(
-            HttpExchange exchange,
-            String location
-    ) throws IOException {
-        exchange.getResponseHeaders().set(
-                "Location",
-                location
-        );
-
+    private static void redirect( HttpExchange exchange, String location ) throws IOException {
+        Logger.debug("Redirect -> {}", location);
+        exchange.getResponseHeaders().set( "Location", location );
         sendStatus(exchange, 302);
     }
 
-    private static void sendStatus(
-            HttpExchange exchange,
-            int status
-    ) throws IOException {
+    private static void sendStatus( HttpExchange exchange, int status ) throws IOException {
         exchange.sendResponseHeaders(status, -1);
         exchange.close();
     }
