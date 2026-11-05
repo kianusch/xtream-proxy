@@ -135,7 +135,7 @@ public class Uplink {
     }
 
     String getM3U() throws IOException {
-        return xtreamLists.get("live_streams").stringM3U(xtreamLists.get("live_categories"), uplink, streamPostFix);
+        return xtreamLists.get("live_streams").stringM3U(uplink, streamPostFix);
     }
 
     String getEPG() {

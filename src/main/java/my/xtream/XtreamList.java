@@ -108,11 +108,25 @@ public class XtreamList {
     // #EXTINF:-1 tvg-id="" tvg-name="AL - Baby Bandito (2024) S01 E08" tvg-logo="https://image.tmdb.org/t/p/w185/6vHSGeSrwD6FLqMumSz3fHmKJ2S.jpg" group-title="ALBANIA SERIALE",AL - Baby Bandito (2024) S01 E08
     // http://cf.pro-cdn.me:80/series/48833fd7865b/a5700ffdf3/772734.mp4
 
-    String stringM3U(XtreamList categories, String url, String postfix) throws IOException {
+    String stringM3U(String url, String postfix) throws IOException {
         update();
-        Map<String, String> filter = categories.getAll("category_id", "category_name");
-        List<Map<?, ?>> tmp = entries.stream().filter(e -> filter.containsKey(e.get("category_id"))).collect(Collectors.toList());
-        return "#EXTM3U\n" + tmp.stream().map(e -> "#EXTINF:-1 tvg-id=\"\" tvg-name=\"" + e.get("name") + "\" tvg-logo=\"" + e.get("stream_icon") + "\" group-title=\"" + filter.get(e.get("category_id")) + "\"," + e.get("name") + "\n" + HttpClient.mkUrl(url) + e.get("stream_type") + postfix + e.get("stream_id") + ".ts").collect(Collectors.joining("\n"));
+        //Map<String, String> filter = categories.getAll("category_id", "category_name");
+        //List<Map<?, ?>> tmp = entries.stream().filter(e -> filter.containsKey(e.get("category_id"))).collect(Collectors.toList());
+        //return "#EXTM3U\n" + tmp.stream().map(e -> entry2m3u(e,url,postfix,filter.get(e.get("category_id")))).collect(Collectors.joining("\n"));
+        return "#EXTM3U\n" + entries.stream().map(e -> entry2m3u(e,url,postfix)).collect(Collectors.joining("\n"));
+    }
+
+    String entry2m3u(Map<?,?> m, String url, String postfix) {
+        if (parentList == null) return null;
+        String s = (String) m.get("category_id");
+        String gt= (String) parentList.entriesMap.get(s).get("category_name");
+        return "#EXTINF:-1" + " " +
+                "tvg-id" + "=\"" + m.get("epg_channel_id") + "\" " +
+                "tvg-name" + "=\"" + m.get("name") + "\" " +
+                "tvg-logo" + "=\"" + m.get("stream_icon") + "\" " +
+                "group-title" + "=\"" + gt + "\"," +
+                m.get("name") + "\n" +
+                HttpClient.mkUrl(url) + m.get("stream_type") + postfix + m.get("stream_id") + ".ts";
     }
 
     private Map<String, String> getAll(String keyField, String valueField) {
@@ -143,4 +157,5 @@ public class XtreamList {
         }
         return this;
     }
+
 }
